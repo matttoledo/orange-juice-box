@@ -1,0 +1,129 @@
+version: '3.8'
+
+networks:
+  postgresql_network:
+    driver: overlay
+    driver_opts:
+      encrypted: "true"  # Zero Trust: encrypted traffic between services
+    labels:
+      - "description=Encrypted PostgreSQL network (Zero Trust)"
+
+  redis_network:
+    driver: overlay
+    driver_opts:
+      encrypted: "true"
+    labels:
+      - "description=Encrypted Redis network"
+
+volumes:
+  postgresql_data:
+    labels:
+      - "description=PostgreSQL data (CRITICAL - daily backups required)"
+      - "backup=daily"
+      - "critical=true"
+
+services:
+  # ========================================
+  # POSTGRESQL - Shared Database Server
+  # ========================================
+  postgresql:
+    image: postgres:16-alpine
+
+    environment:
+      - POSTGRES_DB=verly_db
+      - POSTGRES_USER=verly_db_owner
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./postgresql/init-scripts:/docker-entrypoint-initdb.d:ro
+
+    networks:
+      - postgresql_network
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+          pids: 200
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+      # Beautiful Portainer Labels
+      labels:
+        - "description=🗄️ PostgreSQL 16 - Shared Database Server"
+        - "category=infrastructure"
+        - "layer=infrastructure"
+        - "component=database"
+        - "exposure=internal"
+        - "status=production"
+        - "version=16-alpine"
+        - "critical=true"
+        - "backup=daily"
+        - "databases=verly_db,redash"
+        - "connections=verly-service,redash"
+        - "network-encryption=ipsec"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U verly_db_owner -d verly_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ========================================
+  # REDIS - Cache Server (for Redash)
+  # ========================================
+  redis:
+    image: redis:7-alpine
+
+    command: redis-server --appendonly yes
+
+    volumes:
+      - redis_data:/data
+
+    networks:
+      - redis_network
+
+    deploy:
+      mode: replicated
+      replicas: 1
+
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+      # Portainer Labels
+      labels:
+        - "description=💾 Redis 7 - Cache Server (Redash & Future Apps)"
+        - "category=infrastructure"
+        - "layer=infrastructure"
+        - "component=cache"
+        - "exposure=internal"
+        - "status=production"
+        - "version=7-alpine"
+        - "persistence=aof"
+        - "connections=redash"
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+    labels:
+      - "description=Redis persistent data (AOF)"

@@ -1,0 +1,133 @@
+version: '3.8'
+
+# ========================================
+# PUBLIC APPLICATION TEMPLATE
+# ========================================
+# This template is for applications exposed to the internet
+#
+# AUTOMATIC PROTECTION:
+#   ✅ WAF (Coraza WASM - OWASP CRS)
+#   ✅ Rate Limiting (50 req/min)
+#   ✅ CrowdSec (17,000+ blocked IPs)
+#   ✅ Security Headers (HSTS, CSP, XSS)
+#   ✅ Container Hardening (OWASP Docker Top 10)
+#
+# USAGE:
+#   1. Copy this template: cp -r _template-public my-app
+#   2. Edit placeholders: my-app, my-app.verlyvidracaria.com, 8080
+#   3. Deploy: docker stack deploy -c docker-compose.yml my-app
+#
+# ========================================
+
+networks:
+  traefik_public:
+    external: true
+
+  postgresql_network:
+    external: true
+    # Uncomment if your app needs database access
+    # name: infrastructure_postgresql_network
+
+  monitoring_net:
+    external: true
+    # Uncomment if your app exports metrics
+    # name: observability_monitoring_net
+
+services:
+  my-app:
+    image: my-app:latest
+
+    # ========================================
+    # CONTAINER HARDENING (OWASP Docker Top 10)
+    # ========================================
+    user: "1000:1000"              # Non-root user
+    read_only: true                # Read-only filesystem
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64M
+    cap_drop:
+      - ALL                        # Drop all capabilities
+    security_opt:
+      - no-new-privileges:true     # Prevent privilege escalation
+
+    environment:
+      # Add your environment variables here
+      - APP_ENV=production
+
+    networks:
+      - traefik_public
+      # - postgresql_network        # Uncomment if needed
+      # - monitoring_net            # Uncomment if needed
+
+    deploy:
+      mode: replicated
+      replicas: 1
+
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+          pids: 100
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+      update_config:
+        failure_action: rollback
+        monitor: 30s
+        order: start-first
+
+      # ============================================
+      # PORTAINER UI LABELS
+      # ============================================
+      labels:
+        # Service description
+        - "description=🚀 My App - Public Application"
+
+        # Category and organization
+        - "category=application"
+        - "layer=applications"
+        - "component=web-app"
+        - "app-type=public"
+
+        # Status
+        - "exposure=internet"
+        - "status=production"
+
+        # Security
+        - "protection=waf,ratelimit-50/min,crowdsec,headers"
+        - "hardening=owasp-docker-top-10"
+
+        # ============================================
+        # TRAEFIK ROUTING LABELS
+        # ============================================
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik_public"
+
+        # Router configuration
+        - "traefik.http.routers.my-app.rule=Host(`my-app.verlyvidracaria.com`)"
+        - "traefik.http.routers.my-app.entrypoints=websecure"
+        - "traefik.http.routers.my-app.tls=true"
+        - "traefik.http.routers.my-app.tls.certresolver=letsencrypt"
+
+        # ⚠️ FULL PROTECTION (automatic for public apps)
+        - "traefik.http.routers.my-app.middlewares=auto-public-protection@file"
+
+        # Service configuration
+        - "traefik.http.services.my-app.loadbalancer.server.port=8080"
+
+        # Health check (optional but recommended)
+        - "traefik.http.services.my-app.loadbalancer.healthcheck.path=/health"
+        - "traefik.http.services.my-app.loadbalancer.healthcheck.interval=30s"
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

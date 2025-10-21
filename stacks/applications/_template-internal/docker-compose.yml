@@ -1,0 +1,104 @@
+version: '3.8'
+
+# ========================================
+# INTERNAL APPLICATION TEMPLATE
+# ========================================
+# This template is for applications accessible ONLY from LAN
+#
+# PROTECTION:
+#   ❌ NO WAF (not exposed to internet)
+#   ❌ NO Rate Limiting (trusted LAN)
+#   ❌ NO CrowdSec (LAN IPs are whitelisted)
+#   ❌ NO Security Headers (unnecessary overhead)
+#   ✅ UFW Firewall (blocks external access to internal ports)
+#   ✅ Traefik routing (.nip.io domains only)
+#
+# USAGE:
+#   1. Copy this template: cp -r _template-internal my-dashboard
+#   2. Edit placeholders: my-dashboard, 3000
+#   3. Deploy: docker stack deploy -c docker-compose.yml my-dashboard
+#
+# ========================================
+
+networks:
+  traefik_public:
+    external: true
+
+  postgresql_network:
+    external: true
+    # Uncomment if your app needs database access
+    # name: infrastructure_postgresql_network
+
+services:
+  my-dashboard:
+    image: my-dashboard:latest
+
+    # Optional: Container hardening (recommended but not required for internal apps)
+    # user: "1000:1000"
+    # read_only: true
+    # cap_drop: [ALL]
+
+    environment:
+      # Add your environment variables here
+      - APP_ENV=production
+
+    networks:
+      - traefik_public
+      # - postgresql_network        # Uncomment if needed
+
+    deploy:
+      mode: replicated
+      replicas: 1
+
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+      # ============================================
+      # PORTAINER UI LABELS
+      # ============================================
+      labels:
+        # Service description
+        - "description=📊 My Dashboard - Internal Tool"
+
+        # Category and organization
+        - "category=observability"
+        - "layer=observability"
+        - "component=dashboard"
+
+        # Status
+        - "exposure=lan"
+        - "status=production"
+
+        # Security (minimal for LAN)
+        - "protection=firewall-only"
+
+        # ============================================
+        # TRAEFIK ROUTING LABELS
+        # ============================================
+        - "traefik.enable=true"
+
+        # Router configuration (LAN-only domain)
+        - "traefik.http.routers.my-dashboard.rule=Host(`my-dashboard.192.168.0.2.nip.io`)"
+        - "traefik.http.routers.my-dashboard.entrypoints=web"
+
+        # NO middlewares! (maximum simplicity and performance)
+
+        # Service configuration
+        - "traefik.http.services.my-dashboard.loadbalancer.server.port=3000"
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
