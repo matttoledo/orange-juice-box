@@ -68,7 +68,7 @@ services:
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik/config:/etc/traefik/dynamic:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
       - traefik_logs:/var/log/traefik
       - traefik_acme:/letsencrypt
 

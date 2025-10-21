@@ -22,6 +22,10 @@ volumes:
       - "backup=daily"
       - "critical=true"
 
+  redis_data:
+    labels:
+      - "description=Redis persistent data (AOF)"
+
 services:
   # ========================================
   # POSTGRESQL - Shared Database Server
@@ -52,7 +56,6 @@ services:
         limits:
           cpus: '2.0'
           memory: 2G
-          pids: 200
         reservations:
           cpus: '0.5'
           memory: 512M
@@ -122,8 +125,3 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-volumes:
-  redis_data:
-    labels:
-      - "description=Redis persistent data (AOF)"

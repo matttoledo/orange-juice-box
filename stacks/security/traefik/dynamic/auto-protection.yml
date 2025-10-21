@@ -78,21 +78,33 @@ http:
     # Usage: traefik.http.routers.APP.middlewares=auto-public-protection@file
     #
     # Protection flow:
-    #   Internet → WAF (Coraza) → Rate Limit → CrowdSec → Headers → App
+    #   Internet → Rate Limit → CrowdSec → Headers → App
     #
     # This provides:
-    #   ✅ WAF protection (OWASP CRS - SQLi, XSS, RCE, LFI, etc)
     #   ✅ Rate limiting (50/min, burst 25)
     #   ✅ CrowdSec IP blocking (17,000+ malicious IPs)
     #   ✅ Security headers (HSTS, CSP, XSS, Clickjacking)
     #
+    # NOTE: WAF (Coraza) temporarily disabled - requires Traefik plugin configuration
+    #
     auto-public-protection:
       chain:
         middlewares:
-          - waf-coraza                    # 1. WAF first (blocks attacks)
-          - rate-limit-strict             # 2. Rate limiting (DDoS protection)
-          - crowdsec-bouncer@swarm        # 3. CrowdSec (IP reputation)
-          - security-headers-public       # 4. Security headers (browser protection)
+          # - waf-coraza                  # TODO: Enable after configuring Coraza plugin
+          - rate-limit-strict             # 1. Rate limiting (DDoS protection)
+          - crowdsec-bouncer@swarm        # 2. CrowdSec (IP reputation)
+          - security-headers-public       # 3. Security headers (browser protection)
+
+    # ========================================
+    # LEGACY COMPATIBILITY
+    # ========================================
+    # Alias for backward compatibility with old deployments
+    global-api-security:
+      chain:
+        middlewares:
+          - rate-limit-strict
+          - crowdsec-bouncer@swarm
+          - security-headers-public
 
     # ========================================
     # UTILITY MIDDLEWARES
