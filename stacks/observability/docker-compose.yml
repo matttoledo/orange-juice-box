@@ -152,7 +152,7 @@ services:
   # REDASH - Data Visualization & BI
   # ========================================
   redash:
-    image: redash/redash:latest
+    image: ghcr.io/ktmrmshk/redash_arm64:latest  # Community ARM64 build
 
     environment:
       # Database for Redash metadata
@@ -226,7 +226,7 @@ services:
   # REDASH WORKER - Background Jobs
   # ========================================
   redash-worker:
-    image: redash/redash:latest
+    image: ghcr.io/ktmrmshk/redash_arm64:latest  # Community ARM64 build
 
     environment:
       - REDASH_DATABASE_URL=postgresql://redash_user:${REDASH_DB_PASSWORD}@postgresql:5432/redash
@@ -357,8 +357,11 @@ services:
         - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9000/api/status || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9000/ || exit 1"]
       interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # ========================================
   # CADVISOR - Container Metrics

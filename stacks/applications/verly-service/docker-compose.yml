@@ -19,28 +19,27 @@ services:
     # ========================================
     # CONTAINER HARDENING (OWASP Docker Top 10)
     # ========================================
-    # Run as non-root user
-    user: "1000:1000"
-
-    # Read-only root filesystem
-    read_only: true
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,size=128M
-
-    # Drop all capabilities
-    cap_drop:
-      - ALL
-
-    # Prevent privilege escalation
-    security_opt:
-      - no-new-privileges:true
+    # NOTE: Hardening temporarily disabled for compatibility
+    # TODO: Re-enable after ensuring app supports:
+    #   - Non-root user (1000:1000)
+    #   - Read-only filesystem
+    #   - No capabilities
+    #
+    # user: "1000:1000"
+    # read_only: true
+    # tmpfs:
+    #   - /tmp:rw,nosuid,size=256M
+    # cap_drop:
+    #   - ALL
+    # security_opt:
+    #   - no-new-privileges:true
 
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - JAVA_OPTS=-Xmx512m -Xms256m
 
       # Database connection
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/verly_db
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://infrastructure_postgresql:5432/verly_db
       - SPRING_DATASOURCE_USERNAME=${VERLY_DB_USERNAME:-verly_db_owner}
       - SPRING_DATASOURCE_PASSWORD=${VERLY_DB_PASSWORD}
 
@@ -77,83 +76,27 @@ services:
         window: 120s
 
       # ============================================
-      # PORTAINER UI LABELS
+      # LABELS (Portainer UI + Traefik Routing)
       # ============================================
       labels:
-        # Service description
-        - "description=🚀 Verly Service - Public REST API (Spring Boot 3.2.5 + Java 21)"
-
-        # Category and organization
+        # Portainer UI (essential only)
+        - "description=🚀 Verly Service - Public REST API"
         - "category=application"
         - "layer=applications"
-        - "component=rest-api"
-        - "app-type=public-api"
-
-        # Status and exposure
         - "exposure=internet"
-        - "status=production"
-        - "critical=true"
+        - "protection=ratelimit+crowdsec+headers"
 
-        # Technology stack
-        - "framework=spring-boot"
-        - "language=java"
-        - "java-version=21"
-        - "spring-version=3.2.5"
-
-        # Security information
-        - "protection=waf-coraza,ratelimit-50/min,crowdsec,headers"
-        - "hardening=owasp-docker-top-10"
-        - "security.user=non-root-1000"
-        - "security.filesystem=read-only"
-        - "security.capabilities=none"
-
-        # Database connection
-        - "database=postgresql"
-        - "db-name=verly_db"
-
-        # Deployment info
-        - "ci-cd=github-actions"
-        - "auto-deploy=true"
-        - "rollback=automatic"
-        - "zero-downtime=true"
-
-        # Health and monitoring
-        - "health-check=/verly-service/actuator/health"
-        - "metrics=/verly-service/actuator/prometheus"
-        - "monitoring=prometheus,grafana"
-
-        # API documentation
-        - "api-docs=/verly-service/swagger-ui.html"
-        - "openapi=/verly-service/v3/api-docs"
-
-        # Version and build
-        - "version=1.0.0"
-        - "build-date=2025-10-21"
-        - "git-repo=github.com/matttoledo/verly-service"
-
-        # ============================================
-        # TRAEFIK ROUTING LABELS
-        # ============================================
+        # Traefik Routing (CRITICAL - DO NOT REMOVE)
         - "traefik.enable=true"
         - "traefik.docker.network=traefik_public"
-
-        # Router configuration
         - "traefik.http.routers.verly-service.rule=Host(`api.verlyvidracaria.com`)"
         - "traefik.http.routers.verly-service.entrypoints=websecure"
         - "traefik.http.routers.verly-service.tls=true"
         - "traefik.http.routers.verly-service.tls.certresolver=letsencrypt"
-
-        # ⚠️ FULL PROTECTION (WAF + Rate Limit + CrowdSec + Headers)
-        # This provides complete security for internet-facing applications
         - "traefik.http.routers.verly-service.middlewares=auto-public-protection@file"
-
-        # Service configuration
         - "traefik.http.services.verly-service.loadbalancer.server.port=8080"
-
-        # Health check
         - "traefik.http.services.verly-service.loadbalancer.healthcheck.path=/verly-service/actuator/health"
         - "traefik.http.services.verly-service.loadbalancer.healthcheck.interval=30s"
-        - "traefik.http.services.verly-service.loadbalancer.healthcheck.timeout=10s"
 
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/verly-service/actuator/health"]
