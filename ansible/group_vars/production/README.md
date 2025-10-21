@@ -1,56 +1,56 @@
 # Production Secrets
 
-Este diretório contém secrets criptografados com SOPS para o ambiente de produção.
+This directory contains SOPS-encrypted secrets for the production environment.
 
-## Pré-requisitos
+## Prerequisites
 
-1. **age** e **SOPS** instalados
-2. Chave age configurada em `~/.config/sops/age/keys.txt`
+1. **age** and **SOPS** installed
+2. age key configured in `~/.config/sops/age/keys.txt`
 
-## Como usar
+## How to Use
 
-### Ver secrets (descriptografar temporariamente)
+### View secrets (decrypt temporarily)
 ```bash
 sops --decrypt secrets.yml
 ```
 
-### Editar secrets
+### Edit secrets
 ```bash
 sops secrets.yml
 ```
-Isso abrirá o arquivo descriptografado no seu editor. Ao salvar, será automaticamente re-criptografado.
+This will open the decrypted file in your editor. When saved, it will be automatically re-encrypted.
 
-### Adicionar novo secret
+### Add new secret
 ```bash
 sops secrets.yml
-# Adicione a nova linha
-# Salve e feche
+# Add the new line
+# Save and close
 ```
 
-## Usando secrets no Ansible
+## Using Secrets in Ansible
 
-Os secrets são automaticamente descriptografados durante a execução do playbook:
+Secrets are automatically decrypted during playbook execution:
 
 ```yaml
-# No playbook ou docker-compose
+# In playbook or docker-compose
 environment:
   - SPRING_DATASOURCE_PASSWORD={{ verly_db_password }}
 ```
 
-## Backup da chave age
+## Backup age Key
 
-⚠️ **IMPORTANTE**: Faça backup da sua chave age privada!
+⚠️ **IMPORTANT**: Backup your age private key!
 
 ```bash
-cp ~/.config/sops/age/keys.txt ~/backup-seguro/age-keys-backup.txt
+cp ~/.config/sops/age/keys.txt ~/secure-backup/age-keys-backup.txt
 ```
 
-Sem a chave privada, você não conseguirá descriptografar os secrets!
+Without the private key, you won't be able to decrypt the secrets!
 
-## Chave pública age
+## age Public Key
 
 ```
 age1lp0mjc900vahqvuyg6dr45vcpu03pddljspkhw6pppj8k5vp49kqynk9nq
 ```
 
-Esta chave pública está configurada em `.sops.yaml` na raiz do repositório.
+This public key is configured in `.sops.yaml` at the repository root.
