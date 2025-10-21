@@ -1,0 +1,16 @@
+# SOPS Configuration for Orange Juice Box
+# Copie para .sops.yaml e adicione sua chave age pública
+
+creation_rules:
+  # Secrets do Ansible
+  - path_regex: ansible/group_vars/.*/secrets\.yml$
+    age: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p  # TROCAR pela sua chave!
+
+  # Arquivos .env criptografados
+  - path_regex: .*\.env\.encrypted$
+    age: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p  # TROCAR pela sua chave!
+
+# Como obter sua chave age:
+# 1. Execute: ./scripts/generate-secrets.sh
+# 2. Copie a "public key" mostrada
+# 3. Substitua nos lugares marcados com "TROCAR pela sua chave!"

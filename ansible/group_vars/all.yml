@@ -1,0 +1,33 @@
+---
+# 🍊 Orange Juice Box - Variáveis Globais
+
+# ARM64 Configuration
+docker_arch: arm64
+docker_compose_arch: linux-aarch64
+target_platform: linux/arm64
+
+# Docker
+docker_version: "24.0"
+docker_compose_version: "2.23.0"
+
+# Networks
+traefik_network: traefik_public
+
+# Paths
+stacks_base_path: "{{ playbook_dir }}/../stacks"
+backup_path: "/home/matt/backups/orange-juice-box"
+scripts_path: "{{ playbook_dir }}/../scripts"
+
+# Domain
+domain: "verlyvidracaria.com"
+
+# Monitoring
+grafana_port: 3000
+prometheus_port: 9091
+alertmanager_port: 9093
+dozzle_port: 8888
+portainer_port: 9000
+
+# Orange Juice Box
+juice_box_version: "1.0.0"
+juice_box_environment: "production"

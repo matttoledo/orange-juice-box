@@ -1,0 +1,36 @@
+---
+all:
+  vars:
+    # User
+    ansible_user: matt
+    ansible_become: yes
+
+    # ARM64
+    ansible_architecture: aarch64
+    docker_platform: linux/arm64
+    docker_arch: arm64
+
+    # Domain
+    domain: verlyvidracaria.com
+
+    # Paths
+    stacks_base_path: "{{ playbook_dir }}/../../stacks"
+    backup_path: "/home/matt/backups/orange-juice-box"
+
+    # Docker
+    docker_version: "24.0"
+    docker_compose_version: "2.23.0"
+
+    # Networks
+    traefik_network: traefik_public
+
+  children:
+    swarm_managers:
+      hosts:
+        orangepi:
+          ansible_host: 192.168.0.2
+          node_role: manager
+          node_labels:
+            - "box=orange-juice"
+            - "arch=arm64"
+            - "role=manager"

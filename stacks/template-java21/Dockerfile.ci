@@ -1,0 +1,43 @@
+# Dockerfile otimizado para CI/CD - usa JAR pré-compilado
+# Este Dockerfile assume que o JAR já foi compilado e está em target/
+
+# Etapa de extração de layers
+FROM eclipse-temurin:21-jre-jammy AS extractor
+WORKDIR /app
+COPY target/*.jar app.jar
+RUN java -Djarmode=layertools -jar app.jar extract
+
+# Imagem final otimizada
+FROM eclipse-temurin:21-jre-jammy AS app
+WORKDIR /app
+
+# Otimizações de JVM para PRODUÇÃO
+# - UseContainerSupport: Detecta limites de CPU/memória do container
+# - MaxRAMPercentage: Usa até 75% da RAM disponível
+# - InitialRAMPercentage: Começa com 50% da RAM
+# - UseG1GC: Garbage Collector otimizado para low-latency
+# - MaxGCPauseMillis: Limita pausas de GC a 200ms
+# - UseStringDeduplication: Reduz uso de memória com Strings
+# - TieredCompilation: Compilação JIT otimizada
+# - TieredStopAtLevel=1: Startup mais rápido (C1 compiler only)
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport \
+  -XX:MaxRAMPercentage=75.0 \
+  -XX:InitialRAMPercentage=50.0 \
+  -XX:+UseG1GC \
+  -XX:MaxGCPauseMillis=200 \
+  -XX:+UseStringDeduplication \
+  -XX:+TieredCompilation \
+  -XX:TieredStopAtLevel=1"
+
+# Copiar layers separadamente para melhor cache
+# Ordem: menos mudança → mais mudança
+COPY --from=extractor /app/dependencies/ ./
+COPY --from=extractor /app/spring-boot-loader/ ./
+COPY --from=extractor /app/snapshot-dependencies/ ./
+COPY --from=extractor /app/application/ ./
+
+# Usar usuário não-root
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
+
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]

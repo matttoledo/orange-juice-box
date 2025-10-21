@@ -1,0 +1,62 @@
+---
+# 🍊 Orange Juice Box - Playbook Principal
+# Setup completo da infraestrutura
+
+- name: Orange Juice Box - Setup Completo
+  hosts: all
+  become: yes
+
+  pre_tasks:
+    - name: 🍊 Orange Juice Box Banner
+      debug:
+        msg: |
+          ╔═══════════════════════════════════════╗
+          ║   🍊 ORANGE JUICE BOX 📦              ║
+          ║   Infrastructure as Code              ║
+          ║   ARM64 Docker Swarm                  ║
+          ║   Version: {{ juice_box_version }}    ║
+          ╚═══════════════════════════════════════╝
+
+    - name: Verificar arquitetura
+      assert:
+        that:
+          - ansible_architecture == "aarch64"
+        fail_msg: "Este playbook é para ARM64/aarch64 apenas!"
+        success_msg: "✅ Arquitetura ARM64 confirmada"
+
+  tasks:
+    - name: Atualizar cache apt
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Instalar pacotes essenciais
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - htop
+          - vim
+          - python3-pip
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+
+- name: Informações do Sistema
+  hosts: all
+  become: yes
+  tasks:
+    - name: Coletar fatos do sistema
+      setup:
+
+    - name: Exibir informações
+      debug:
+        msg:
+          - "Hostname: {{ ansible_hostname }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Arch: {{ ansible_architecture }}"
+          - "CPU: {{ ansible_processor_vcpus }} cores"
+          - "RAM: {{ (ansible_memtotal_mb / 1024) | round(1) }} GB"
+          - "Docker: {{ ansible_facts.docker_version | default('não instalado') }}"

@@ -1,0 +1,69 @@
+# Orange Juice Box - .gitignore
+
+# Secrets e chaves privadas (NUNCA commit!)
+*.env
+!.env.example
+.env.*
+!.env.example.*
+**/.env
+**/secrets.yml.dec
+**/secrets.dec.*
+
+# age keys (SOPS)
+keys.txt
+*.key
+*.pem
+id_rsa*
+id_ed25519*
+
+# Ansible
+*.retry
+.ansible/
+ansible.log
+/tmp/ansible_facts/
+
+# Backups
+backups/
+*.tar.gz
+*.sql
+*.dump
+
+# Logs
+*.log
+logs/
+**/logs/
+traefik/logs/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.project
+.settings/
+
+# Docker
+.dockerignore
+
+# Python (Ansible)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+ENV/
+
+# OS
+.Trash-*
+.nfs*
+
+# Orange Juice Box specific
+orange-juice-box-data/
+monitoring-data/
