@@ -1,0 +1,10 @@
+# SOPS Configuration for Orange Juice Box
+
+creation_rules:
+  # Secrets do Ansible
+  - path_regex: ansible/group_vars/.*/secrets\.yml$
+    age: age1lp0mjc900vahqvuyg6dr45vcpu03pddljspkhw6pppj8k5vp49kqynk9nq
+
+  # Arquivos .env criptografados
+  - path_regex: .*\.env\.encrypted$
+    age: age1lp0mjc900vahqvuyg6dr45vcpu03pddljspkhw6pppj8k5vp49kqynk9nq
