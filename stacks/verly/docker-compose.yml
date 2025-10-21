@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  verly-service:
+    image: verly-service:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-Xmx512m -Xms256m
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/verly_db
+      - SPRING_DATASOURCE_USERNAME=verly_db_owner
+      - SPRING_DATASOURCE_PASSWORD=yKEv8rW1ViQB
+    networks:
+      - traefik_public
+      - swarm-monitoring_net
+      - postgresql_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 60s
+        order: start-first
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 384M
+      labels:
+        - "traefik.enable=true"
+
+        # Router HTTPS (primary) com proteção automática
+        - "traefik.http.routers.verly-service.rule=Host(`api.verlyvidracaria.com`)"
+        - "traefik.http.routers.verly-service.entrypoints=websecure"
+        - "traefik.http.routers.verly-service.tls=true"
+        - "traefik.http.routers.verly-service.middlewares=global-api-security@file"
+
+        # Router HTTP (fallback)
+        - "traefik.http.routers.verly-service-http.rule=Host(`api.verlyvidracaria.com`)"
+        - "traefik.http.routers.verly-service-http.entrypoints=web"
+        - "traefik.http.routers.verly-service-http.middlewares=global-api-security@file"
+
+        # Service
+        - "traefik.http.services.verly-service.loadbalancer.server.port=8080"
+        - "traefik.docker.network=traefik_public"
+        - "traefik.http.services.verly-service.loadbalancer.healthcheck.path=/verly-service/actuator/health"
+        - "traefik.http.services.verly-service.loadbalancer.healthcheck.interval=30s"
+        - "traefik.http.services.verly-service.loadbalancer.healthcheck.timeout=30s"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/verly-service/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=verly-service"
+
+networks:
+  traefik_public:
+    external: true
+  swarm-monitoring_net:
+    external: true
+  postgresql_network:
+    external: true
+    name: postgresql_postgresql_network

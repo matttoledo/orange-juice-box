@@ -1,0 +1,39 @@
+---
+# 🍊 Orange Juice Box - Deploy de Stacks
+# Deploy todos os stacks do Docker Swarm
+
+- name: Deploy Orange Juice Box Stacks
+  hosts: swarm_managers
+  become: no
+
+  vars_files:
+    - ../group_vars/production/secrets.yml
+
+  tasks:
+    - name: Verificar se Docker Swarm está ativo
+      command: docker info --format '{{ '{{' }}.Swarm.LocalNodeState{{ '}}' }}'
+      register: swarm_state
+      changed_when: false
+
+    - name: Falhar se Swarm não estiver ativo
+      assert:
+        that:
+          - swarm_state.stdout == "active"
+        fail_msg: "Docker Swarm não está ativo! Execute playbook setup-swarm.yml primeiro."
+
+    - name: Banner
+      debug:
+        msg: "🚀 Deploying Orange Juice Box Stacks..."
+
+    # Note: Este é um exemplo básico
+    # Os stacks reais devem ser deployados manualmente com docker stack deploy
+    # porque precisam de .env files específicos por stack
+
+    - name: Informação
+      debug:
+        msg:
+          - "Este playbook é um exemplo básico."
+          - "Para deploy real dos stacks:"
+          - "  cd stacks/security && docker stack deploy -c docker-compose.yml security"
+          - "  cd stacks/verly && docker stack deploy -c docker-compose.yml verly"
+          - "Ou use os scripts de deploy específicos de cada stack."
