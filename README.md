@@ -1,18 +1,18 @@
 # 🍊 Orange Juice Box
 
-> Infrastructure as Code para Orange Pi Docker Swarm (ARM64)
+> Infrastructure as Code for Orange Pi Docker Swarm (ARM64)
 
-**Orange Juice Box** é o repositório centralizado de toda infraestrutura do ambiente Verly, incluindo Docker Swarm stacks, CI/CD templates, e automação com Ansible.
+**Orange Juice Box** is the centralized repository for the entire Verly environment infrastructure, including Docker Swarm stacks, CI/CD templates, and Ansible automation.
 
 ```
 🍊 Orange     - Orange Pi hardware (ARM64)
-🧃 Juice      - O "suco" da infraestrutura (Docker, Traefik, apps)
-📦 Box        - Container que organiza tudo
+🧃 Juice      - The infrastructure "juice" (Docker, Traefik, apps)
+📦 Box        - Container that organizes everything
 ```
 
 ---
 
-## 🏗️ Arquitetura
+## 🏗️ Architecture
 
 - **Hardware**: Orange Pi 5 Plus (ARM64/aarch64)
 - **OS**: Ubuntu 22.04 LTS ARM64
@@ -27,9 +27,9 @@
 
 ---
 
-## 📋 Stacks Deployados
+## 📋 Deployed Stacks
 
-| Stack | Serviços | Status |
+| Stack | Services | Status |
 |-------|----------|--------|
 | **security** | Traefik, CrowdSec, ModSecurity, Bouncer, Dashboard | ✅ |
 | **monitoring** | Prometheus, Grafana, cAdvisor, Node Exporter | ✅ |
@@ -42,136 +42,136 @@
 
 ## 🚀 Quick Start
 
-### Requisitos
+### Requirements
 
 - **Hardware**: ARM64/aarch64 (Orange Pi, Raspberry Pi 4+, AWS Graviton)
-- **RAM**: Mínimo 4GB, recomendado 8GB
-- **Storage**: SSD recomendado
+- **RAM**: Minimum 4GB, recommended 8GB
+- **Storage**: SSD recommended
 - **Software**: Ubuntu 20.04+ ARM64, Git, Make
 
-### Instalação
+### Installation
 
 ```bash
-# 1. Clonar repositório
-git clone https://github.com/verlao/orange-juice-box.git
+# 1. Clone repository
+git clone https://github.com/matttoledo/orange-juice-box.git
 cd orange-juice-box
 
-# 2. Instalar dependências (Ansible, SOPS, age)
+# 2. Install dependencies (Ansible, SOPS, age)
 make install-deps
 
-# 3. Configurar secrets (primeira vez)
+# 3. Configure secrets (first time)
 ./scripts/generate-secrets.sh
 sops ansible/group_vars/production/secrets.yml
 
-# 4. Setup infraestrutura completa
+# 4. Setup complete infrastructure
 make setup
 
-# 5. Deploy todos os stacks
+# 5. Deploy all stacks
 make deploy-all
 ```
 
 ---
 
-## 🎯 Comandos Principais
+## 🎯 Main Commands
 
 ```bash
-make help                    # Lista todos os comandos
-make install-deps            # Instala Ansible, SOPS, age
-make setup                   # Setup inicial (Swarm + configs)
-make deploy-all              # Deploy todos os stacks
-make deploy STACK=verly      # Deploy stack específico
-make backup                  # Backup de volumes
-make health-check            # Verifica saúde dos serviços
-make verify-arm64            # Verifica compatibilidade ARM64
+make help                    # List all commands
+make install-deps            # Install Ansible, SOPS, age
+make setup                   # Initial setup (Swarm + configs)
+make deploy-all              # Deploy all stacks
+make deploy STACK=verly      # Deploy specific stack
+make backup                  # Backup volumes
+make health-check            # Check services health
+make verify-arm64            # Verify ARM64 compatibility
 ```
 
 ---
 
-## 📚 Documentação
+## 📚 Documentation
 
-### Guias Principais
-- [📐 Arquitetura](docs/architecture.md) - Diagrama e visão geral da infra
-- [🍊 ARM64 Compatibility](docs/arm64-compatibility.md) - Guia específico ARM64
-- [🔐 SOPS Guide](docs/sops-guide.md) - Como gerenciar secrets
-- [☕ Java 21 Template](docs/java21-spring-boot-template.md) - Template CI/CD completo
-- [🔄 CI/CD Comparison](docs/ci-cd-comparison.md) - Híbrido vs Self-hosted
-- [💾 Disaster Recovery](docs/disaster-recovery.md) - Backup e restore
-- [📖 Runbook](docs/runbook.md) - Procedimentos operacionais
+### Main Guides
+- [📐 Architecture](docs/architecture.md) - Diagram and infrastructure overview
+- [🍊 ARM64 Compatibility](docs/arm64-compatibility.md) - ARM64 specific guide
+- [🔐 SOPS Guide](docs/sops-guide.md) - How to manage secrets
+- [☕ Java 21 Template](docs/java21-spring-boot-template.md) - Complete CI/CD template
+- [🔄 CI/CD Comparison](docs/ci-cd-comparison.md) - Hybrid vs Self-hosted
+- [💾 Disaster Recovery](docs/disaster-recovery.md) - Backup and restore
+- [📖 Runbook](docs/runbook.md) - Operational procedures
 
 ### Templates
-- [Java 21 + Spring Boot](stacks/template-java21/) - Template completo reutilizável
+- [Java 21 + Spring Boot](stacks/template-java21/) - Complete reusable template
 
 ---
 
 ## 🔐 Secrets Management
 
-Secrets são criptografados com **SOPS** e seguros para commit no Git.
+Secrets are encrypted with **SOPS** and safe to commit to Git.
 
 ```bash
-# Editar secrets (descriptografa automaticamente no editor)
+# Edit secrets (automatically decrypts in editor)
 sops ansible/group_vars/production/secrets.yml
 
-# Verificar que está criptografado
+# Verify it's encrypted
 head ansible/group_vars/production/secrets.yml
 # postgres_password: ENC[AES256_GCM,data:xR7...]  ✅
 
-# Commit seguro
+# Safe commit
 git add ansible/group_vars/production/secrets.yml
 git commit -m "Update secrets"
 ```
 
-**Nenhum secret em plain text no Git!** 🔒
+**No plaintext secrets in Git!** 🔒
 
 ---
 
 ## 🧃 Template: Java 21 + Spring Boot 3.2.5
 
-Template battle-tested para criar novas aplicações com CI/CD completo:
+Battle-tested template to create new applications with complete CI/CD:
 
-### Stack Técnica
+### Tech Stack
 - Java 21 (Eclipse Temurin)
 - Spring Boot 3.2.5
-- Maven com cache otimizado
-- Docker multi-stage build com layers
-- ARM64 nativo
-- Health checks robustos
-- Rollback automático
+- Maven with optimized cache
+- Docker multi-stage build with layers
+- Native ARM64
+- Robust health checks
+- Automatic rollback
 
-### Duas Opções de CI/CD
+### Two CI/CD Options
 
-#### 🔀 Híbrido (Padrão)
+#### 🔀 Hybrid (Default)
 ```yaml
 test, build, docker: ubuntu-latest (GitHub)
 deploy: self-hosted (Orange Pi)
 ```
-✅ Builds rápidos
-✅ Não sobrecarrega Orange Pi
-✅ 2000 min/mês grátis
-✅ Feedback visual completo no GitHub
+✅ Fast builds
+✅ Doesn't overload Orange Pi
+✅ 2000 min/month free
+✅ Complete visual feedback on GitHub
 
 #### 🏠 Full Self-hosted
 ```yaml
 test, build, docker, deploy: self-hosted (Orange Pi)
 ```
-✅ 100% privacidade
-✅ Minutos ilimitados
-✅ Cache Maven persistente
-✅ Feedback visual idêntico no GitHub
+✅ 100% privacy
+✅ Unlimited minutes
+✅ Persistent Maven cache
+✅ Identical visual feedback on GitHub
 
-**Importante:** Ambas opções têm **feedback visual idêntico** no GitHub Actions! A escolha é apenas onde o código executa.
+**Important:** Both options have **identical visual feedback** on GitHub Actions! The choice is only where the code runs.
 
-Ver: [docs/ci-cd-comparison.md](docs/ci-cd-comparison.md)
+See: [docs/ci-cd-comparison.md](docs/ci-cd-comparison.md)
 
 ---
 
 ## 📊 Performance
 
-**CI/CD típico:**
+**Typical CI/CD:**
 - Test: ~2min
 - Build: ~1min
 - Docker build: ~2min
 - Deploy + health: ~1min
-- **Total: 4-6min** do push ao ar ⚡
+- **Total: 4-6min** from push to live ⚡
 
 **Spring Boot startup (ARM64):**
 - Cold start: ~35s
@@ -179,19 +179,19 @@ Ver: [docs/ci-cd-comparison.md](docs/ci-cd-comparison.md)
 
 ---
 
-## 🛠️ Infraestrutura
+## 🛠️ Infrastructure
 
 ### Networks
-- `traefik_public` - Rede pública exposta
-- `security_internal` - Rede interna (CrowdSec, etc)
-- Outras redes overlay por stack
+- `traefik_public` - Public exposed network
+- `security_internal` - Internal network (CrowdSec, etc)
+- Other overlay networks per stack
 
-### Volumes Principais
+### Main Volumes
 - `postgresql_data` - Database
-- `traefik_acme` - Certificados SSL
+- `traefik_acme` - SSL certificates
 - `grafana_data` - Dashboards
-- `prometheus_data` - Métricas
-- `crowdsec_data` - Dados de segurança
+- `prometheus_data` - Metrics
+- `crowdsec_data` - Security data
 
 ### Firewall (UFW)
 ```
@@ -208,58 +208,58 @@ Ver: [docs/ci-cd-comparison.md](docs/ci-cd-comparison.md)
 ## 🔄 Disaster Recovery
 
 ```bash
-# Backup completo
+# Complete backup
 make backup
 # → /home/matt/backups/orange-juice-box/YYYY-MM-DD_HHMMSS/
 
-# Restore (documentado em docs/disaster-recovery.md)
+# Restore (documented in docs/disaster-recovery.md)
 ./scripts/restore-volumes.sh /path/to/backup
 ```
 
 ---
 
-## 🎓 Como Criar Nova Aplicação
+## 🎓 How to Create New Application
 
 ```bash
-# 1. Copiar template
-cp -r stacks/template-java21 ~/meu-novo-app/.github
+# 1. Copy template
+cp -r stacks/template-java21 ~/my-new-app/.github
 
-# 2. Ajustar variáveis (SERVICE_NAME, HEALTH_URL)
-vim ~/meu-novo-app/.github/workflows/ci-cd-hybrid.yml
+# 2. Adjust variables (SERVICE_NAME, HEALTH_URL)
+vim ~/my-new-app/.github/workflows/ci-cd-hybrid.yml
 
-# 3. Adicionar ao orange-juice-box
-mkdir stacks/meu-novo-app
-# ... criar docker-compose.yml
+# 3. Add to orange-juice-box
+mkdir stacks/my-new-app
+# ... create docker-compose.yml
 
-# 4. Push e deploy automático!
+# 4. Push and automatic deploy!
 git push origin main
 ```
 
-Ver: [docs/java21-spring-boot-template.md](docs/java21-spring-boot-template.md)
+See: [docs/java21-spring-boot-template.md](docs/java21-spring-boot-template.md)
 
 ---
 
-## 🤝 Contribuindo
+## 🤝 Contributing
 
-1. Fork do repositório
-2. Criar branch (`git checkout -b feature/nova-feature`)
-3. Commit changes (`git commit -am 'Add nova feature'`)
-4. Push to branch (`git push origin feature/nova-feature`)
-5. Criar Pull Request
-
----
-
-## 📝 Licença
-
-MIT License - veja [LICENSE](LICENSE)
+1. Fork the repository
+2. Create branch (`git checkout -b feature/new-feature`)
+3. Commit changes (`git commit -am 'Add new feature'`)
+4. Push to branch (`git push origin feature/new-feature`)
+5. Create Pull Request
 
 ---
 
-## 🙏 Créditos
+## 📝 License
 
-Desenvolvido com ❤️ para Orange Pi ARM64
+MIT License - see [LICENSE](LICENSE)
 
-**Tecnologias:**
+---
+
+## 🙏 Credits
+
+Developed with ❤️ for Orange Pi ARM64
+
+**Technologies:**
 - Docker Swarm
 - Ansible
 - SOPS (Mozilla)
@@ -270,12 +270,12 @@ Desenvolvido com ❤️ para Orange Pi ARM64
 
 ---
 
-## 📞 Suporte
+## 📞 Support
 
-- **Issues**: https://github.com/verlao/orange-juice-box/issues
-- **Documentação**: [docs/](docs/)
+- **Issues**: https://github.com/matttoledo/orange-juice-box/issues
+- **Documentation**: [docs/](docs/)
 - **Runbook**: [docs/runbook.md](docs/runbook.md)
 
 ---
 
-**Orange Juice Box** - O suco concentrado da sua infraestrutura! 🍊📦
+**Orange Juice Box** - The concentrated juice of your infrastructure! 🍊📦
