@@ -58,7 +58,6 @@ services:
         limits:
           cpus: '1.0'
           memory: 768M
-          pids: 100          # Prevent fork bombs
         reservations:
           cpus: '0.25'
           memory: 384M

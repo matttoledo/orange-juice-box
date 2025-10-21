@@ -28,6 +28,10 @@ volumes:
     labels:
       - "description=Prometheus metrics (30 days retention)"
 
+  portainer_data:
+    labels:
+      - "description=Portainer configuration and data"
+
 services:
   # ========================================
   # GRAFANA - Monitoring Dashboards
@@ -433,8 +437,3 @@ services:
         - "status=production"
         - "mode=global"
         - "metrics-for=prometheus"
-
-volumes:
-  portainer_data:
-    labels:
-      - "description=Portainer configuration and data"
