@@ -1,0 +1,440 @@
+version: '3.8'
+
+networks:
+  traefik_public:
+    external: true
+
+  postgresql_network:
+    external: true
+    name: infrastructure_postgresql_network
+
+  redis_network:
+    external: true
+    name: infrastructure_redis_network
+
+  monitoring_net:
+    driver: overlay
+    driver_opts:
+      encrypted: "true"
+    labels:
+      - "description=Monitoring metrics collection network"
+
+volumes:
+  grafana_data:
+    labels:
+      - "description=Grafana dashboards and settings"
+
+  prometheus_data:
+    labels:
+      - "description=Prometheus metrics (30 days retention)"
+
+services:
+  # ========================================
+  # GRAFANA - Monitoring Dashboards
+  # ========================================
+  grafana:
+    image: grafana/grafana:latest
+
+    environment:
+      - GF_SERVER_ROOT_URL=http://grafana.192.168.0.2.nip.io
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+
+    networks:
+      - traefik_public
+      - monitoring_net
+
+    deploy:
+      replicas: 1
+
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+      # Portainer Labels
+      labels:
+        - "description=📊 Grafana - Monitoring Dashboards & Visualizations"
+        - "category=observability"
+        - "layer=observability"
+        - "component=dashboards"
+        - "exposure=lan"
+        - "protection=none"
+        - "status=production"
+        - "version=latest"
+        - "ui=grafana"
+        - "dashboards=10+"
+        - "data-sources=prometheus,loki"
+
+        # Traefik routing (NO middlewares!)
+        - "traefik.enable=true"
+        - "traefik.http.routers.grafana.rule=Host(`grafana.192.168.0.2.nip.io`)"
+        - "traefik.http.routers.grafana.entrypoints=web"
+        - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================
+  # PROMETHEUS - Metrics Collection
+  # ========================================
+  prometheus:
+    image: prom/prometheus:latest
+
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts:/etc/prometheus/alerts:ro
+
+    networks:
+      - monitoring_net
+      - traefik_public
+
+    deploy:
+      replicas: 1
+
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+      # Portainer Labels
+      labels:
+        - "description=📈 Prometheus - Metrics Collection & Time-Series Database"
+        - "category=observability"
+        - "layer=observability"
+        - "component=metrics"
+        - "exposure=lan"
+        - "protection=none"
+        - "status=production"
+        - "version=latest"
+        - "retention=30d"
+        - "scrape-interval=15s"
+        - "targets=traefik,verly-service,postgresql,cadvisor,node-exporter"
+
+        # Traefik routing (NO middlewares!)
+        - "traefik.enable=true"
+        - "traefik.http.routers.prometheus.rule=Host(`prometheus.192.168.0.2.nip.io`)"
+        - "traefik.http.routers.prometheus.entrypoints=web"
+        - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================
+  # REDASH - Data Visualization & BI
+  # ========================================
+  redash:
+    image: redash/redash:latest
+
+    environment:
+      # Database for Redash metadata
+      - REDASH_DATABASE_URL=postgresql://redash_user:${REDASH_DB_PASSWORD}@postgresql:5432/redash
+
+      # Redis for caching and Celery
+      - REDASH_REDIS_URL=redis://redis:6379/0
+
+      # Security secrets
+      - REDASH_SECRET_KEY=${REDASH_SECRET_KEY}
+      - REDASH_COOKIE_SECRET=${REDASH_COOKIE_SECRET}
+
+      # Additional config
+      - PYTHONUNBUFFERED=0
+      - REDASH_LOG_LEVEL=INFO
+      - REDASH_WEB_WORKERS=4
+
+    command: server
+
+    networks:
+      - traefik_public
+      - postgresql_network
+      - redis_network
+      - monitoring_net
+
+    depends_on:
+      - redis
+
+    deploy:
+      replicas: 1
+
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+      # Portainer Labels
+      labels:
+        - "description=📊 Redash - Data Visualization & Business Intelligence"
+        - "category=observability"
+        - "layer=observability"
+        - "component=data-visualization"
+        - "exposure=lan"
+        - "protection=none"
+        - "status=production"
+        - "version=latest"
+        - "ui=redash"
+        - "data-sources=postgresql"
+        - "use-cases=analytics,reports,sql-queries"
+        - "databases=verly_db,redash"
+
+        # Traefik routing (NO middlewares!)
+        - "traefik.enable=true"
+        - "traefik.http.routers.redash.rule=Host(`redash.192.168.0.2.nip.io`)"
+        - "traefik.http.routers.redash.entrypoints=web"
+        - "traefik.http.services.redash.loadbalancer.server.port=5000"
+        - "traefik.http.services.redash.loadbalancer.healthcheck.path=/ping"
+        - "traefik.http.services.redash.loadbalancer.healthcheck.interval=30s"
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ========================================
+  # REDASH WORKER - Background Jobs
+  # ========================================
+  redash-worker:
+    image: redash/redash:latest
+
+    environment:
+      - REDASH_DATABASE_URL=postgresql://redash_user:${REDASH_DB_PASSWORD}@postgresql:5432/redash
+      - REDASH_REDIS_URL=redis://redis:6379/0
+      - REDASH_SECRET_KEY=${REDASH_SECRET_KEY}
+      - QUEUES=queries,scheduled_queries,celery,schemas
+      - WORKERS_COUNT=2
+
+    command: scheduler
+
+    networks:
+      - postgresql_network
+      - redis_network
+
+    depends_on:
+      - redis
+
+    deploy:
+      replicas: 1
+
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+      # Portainer Labels
+      labels:
+        - "description=⚙️ Redash Worker - Background Query Processor"
+        - "category=observability"
+        - "layer=observability"
+        - "component=worker"
+        - "exposure=internal"
+        - "status=production"
+
+  # ========================================
+  # DOZZLE - Docker Logs Viewer
+  # ========================================
+  dozzle:
+    image: amir20/dozzle:latest
+
+    environment:
+      - DOZZLE_LEVEL=info
+      - DOZZLE_NO_ANALYTICS=true
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    networks:
+      - traefik_public
+
+    deploy:
+      replicas: 1
+
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+      # Portainer Labels
+      labels:
+        - "description=🐳 Dozzle - Real-Time Docker Logs Viewer"
+        - "category=observability"
+        - "layer=observability"
+        - "component=logs"
+        - "exposure=lan"
+        - "protection=none"
+        - "status=production"
+        - "version=latest"
+        - "ui=dozzle"
+
+        # Traefik routing (NO middlewares!)
+        - "traefik.enable=true"
+        - "traefik.http.routers.dozzle.rule=Host(`dozzle.192.168.0.2.nip.io`)"
+        - "traefik.http.routers.dozzle.entrypoints=web"
+        - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
+
+  # ========================================
+  # PORTAINER - Docker Swarm Management
+  # ========================================
+  portainer:
+    image: portainer/portainer-ce:latest
+
+    command: -H unix:///var/run/docker.sock
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+
+    networks:
+      - traefik_public
+
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+      # Portainer Labels
+      labels:
+        - "description=🎛️ Portainer CE - Docker Swarm Management UI"
+        - "category=observability"
+        - "layer=observability"
+        - "component=management"
+        - "exposure=lan"
+        - "protection=none"
+        - "status=production"
+        - "version=latest"
+        - "ui=portainer"
+
+        # Traefik routing (NO middlewares!)
+        - "traefik.enable=true"
+        - "traefik.http.routers.portainer.rule=Host(`portainer.192.168.0.2.nip.io`)"
+        - "traefik.http.routers.portainer.entrypoints=web"
+        - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9000/api/status || exit 1"]
+      interval: 30s
+
+  # ========================================
+  # CADVISOR - Container Metrics
+  # ========================================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+    networks:
+      - monitoring_net
+
+    deploy:
+      mode: global
+
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+      # Portainer Labels
+      labels:
+        - "description=📦 cAdvisor - Container Resource Metrics"
+        - "category=observability"
+        - "layer=observability"
+        - "component=metrics"
+        - "exposure=internal"
+        - "status=production"
+        - "mode=global"
+        - "metrics-for=prometheus"
+
+  # ========================================
+  # NODE EXPORTER - Host Metrics
+  # ========================================
+  node-exporter:
+    image: prom/node-exporter:latest
+
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+
+    volumes:
+      - /:/host:ro,rslave
+
+    networks:
+      - monitoring_net
+
+    deploy:
+      mode: global
+
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+
+      # Portainer Labels
+      labels:
+        - "description=💻 Node Exporter - Host System Metrics (CPU, Memory, Disk)"
+        - "category=observability"
+        - "layer=observability"
+        - "component=metrics"
+        - "exposure=internal"
+        - "status=production"
+        - "mode=global"
+        - "metrics-for=prometheus"
+
+volumes:
+  portainer_data:
+    labels:
+      - "description=Portainer configuration and data"

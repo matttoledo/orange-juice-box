@@ -2,7 +2,7 @@
 
 > Infrastructure as Code for Orange Pi Docker Swarm (ARM64)
 
-**Orange Juice Box** is the centralized repository for the entire Verly environment infrastructure, including Docker Swarm stacks, CI/CD templates, and Ansible automation.
+**Orange Juice Box** is a complete homelab infrastructure for Orange Pi 5 Pro, organized in secure layers with modern WAF protection and zero-config deployment for new applications.
 
 ```
 🍊 Orange     - Orange Pi hardware (ARM64)
@@ -14,92 +14,178 @@
 
 ## 🏗️ Architecture
 
-- **Hardware**: Orange Pi 5 Plus (ARM64/aarch64)
+- **Hardware**: Orange Pi 5 Pro (RK3588, 8-core ARM64)
 - **OS**: Ubuntu 22.04 LTS ARM64
 - **Orchestrator**: Docker Swarm (single-node)
 - **Reverse Proxy**: Traefik v3.1
-- **Security**: CrowdSec + ModSecurity WAF
-- **Monitoring**: Prometheus + Grafana + Dozzle
-- **DNS**: AdGuard Home
+- **WAF**: Coraza (WASM, 23x faster than ModSecurity)
+- **Security**: CrowdSec + Rate Limiting + Security Headers
+- **Monitoring**: Prometheus + Grafana
+- **Data Visualization**: Redash
 - **Database**: PostgreSQL 16
-- **Secrets**: SOPS + age encryption 🔐
+- **Secrets**: SOPS + age encryption
 - **CI/CD**: GitHub Actions (self-hosted runner)
 
 ---
 
-## 📋 Deployed Stacks
+## 📦 Layer Organization
 
-| Stack | Services | Status |
-|-------|----------|--------|
-| **security** | Traefik, CrowdSec, ModSecurity, Bouncer, Dashboard | ✅ |
-| **monitoring** | Prometheus, Grafana, cAdvisor, Node Exporter | ✅ |
-| **verly** | Verly Service API (Spring Boot 3.2.5 + Java 21) | ✅ |
-| **postgresql** | PostgreSQL 16 + backups | ✅ |
-| **adguard** | AdGuard Home (DNS filtering) | ✅ |
-| **portainer** | Portainer CE (Docker UI) | ✅ |
+Infrastructure is organized in **4 clean layers** by responsibility:
+
+```
+stacks/
+├── security/           Security Layer - WAF, Traefik, CrowdSec
+├── infrastructure/     Infrastructure Layer - PostgreSQL, Redis
+├── observability/      Observability Layer - Grafana, Prometheus, Redash
+└── applications/       Applications Layer - Verly Service + your apps
+```
+
+### Layer 1: Security
+**Services:** Traefik, CrowdSec, CrowdSec Bouncer, CrowdSec Dashboard
+
+**Responsibility:** Reverse proxy, WAF, threat detection, SSL/TLS termination
+
+### Layer 2: Infrastructure
+**Services:** PostgreSQL 16, Redis
+
+**Responsibility:** Shared data services (databases, caching, message queues)
+
+### Layer 3: Observability
+**Services:** Grafana, Prometheus, Redash, Dozzle, Portainer, cAdvisor, Node Exporter
+
+**Responsibility:** Monitoring, metrics, logs, dashboards, container management
+
+### Layer 4: Applications
+**Services:** Verly Service (+ your applications)
+
+**Responsibility:** Business logic, APIs, microservices
+
+---
+
+## 🛡️ Automatic Protection
+
+### Public Applications (Internet-facing)
+
+All public apps get **automatic full protection** with zero configuration:
+
+```
+Internet → WAF → Rate Limit → CrowdSec → Headers → Your App
+```
+
+**Protection includes:**
+- ✅ **WAF** - Coraza WASM with OWASP Core Rule Set (SQLi, XSS, RCE, LFI protection)
+- ✅ **Rate Limiting** - 50 requests/min (burst 25) to prevent DDoS
+- ✅ **CrowdSec** - 17,000+ malicious IPs blocked automatically
+- ✅ **Security Headers** - HSTS, CSP, XSS Protection, Clickjacking prevention
+- ✅ **Container Hardening** - OWASP Docker Top 10 compliant
+
+**Usage:** Just add one line to your docker-compose.yml:
+```yaml
+- "traefik.http.routers.my-app.middlewares=auto-public-protection@file"
+```
+
+### Internal Applications (LAN-only)
+
+Internal apps have **zero middlewares** for maximum performance:
+
+```
+LAN → Your App (direct)
+```
+
+**Protection:**
+- ✅ **UFW Firewall** - Blocks external access to internal ports
+- ✅ **Traefik Routing** - Only responds to `.nip.io` domains
+- ✅ **Network Segmentation** - Isolated Docker networks
+- ❌ NO WAF, NO Rate Limiting, NO Middlewares (trusted LAN)
 
 ---
 
 ## 🚀 Quick Start
 
-### Requirements
-
-- **Hardware**: ARM64/aarch64 (Orange Pi, Raspberry Pi 4+, AWS Graviton)
-- **RAM**: Minimum 4GB, recommended 8GB
-- **Storage**: SSD recommended
-- **Software**: Ubuntu 20.04+ ARM64, Git, Make
-
-### Installation
+### Deploy All Infrastructure
 
 ```bash
-# 1. Clone repository
+# Clone repository
 git clone https://github.com/matttoledo/orange-juice-box.git
 cd orange-juice-box
 
-# 2. Install dependencies (Ansible, SOPS, age)
-make install-deps
+# Deploy all layers
+./scripts/deploy-all.sh
+```
 
-# 3. Configure secrets (first time)
-./scripts/generate-secrets.sh
-sops ansible/group_vars/production/secrets.yml
+### Create New Public App (with automatic protection)
 
-# 4. Setup complete infrastructure
-make setup
+```bash
+# Create from template
+./scripts/new-public-app.sh my-api my-api.verlyvidracaria.com 8080
 
-# 5. Deploy all stacks
-make deploy-all
+# Edit configuration
+cd stacks/applications/my-api
+vim docker-compose.yml  # Update image, env vars
+
+# Deploy
+docker stack deploy -c docker-compose.yml my-api
+
+# ✅ Your app is now protected by WAF + Rate Limit + CrowdSec!
+```
+
+### Create New Internal App (LAN-only, no middlewares)
+
+```bash
+# Create from template
+./scripts/new-internal-app.sh my-dashboard 3000
+
+# Edit and deploy
+cd stacks/applications/my-dashboard
+vim docker-compose.yml
+docker stack deploy -c docker-compose.yml my-dashboard
+
+# ✅ Fast and simple internal tool!
 ```
 
 ---
 
-## 🎯 Main Commands
+## 🎯 Commands
 
 ```bash
-make help                    # List all commands
-make install-deps            # Install Ansible, SOPS, age
-make setup                   # Initial setup (Swarm + configs)
-make deploy-all              # Deploy all stacks
-make deploy STACK=verly      # Deploy specific stack
-make backup                  # Backup volumes
-make health-check            # Check services health
-make verify-arm64            # Verify ARM64 compatibility
+./scripts/deploy-all.sh                    # Deploy all layers in order
+./scripts/deploy-layer.sh security         # Deploy specific layer
+./scripts/deploy-layer.sh applications     # Deploy all applications
+
+./scripts/new-public-app.sh NAME DOMAIN PORT    # Create public app
+./scripts/new-internal-app.sh NAME PORT         # Create internal app
+
+make help                                  # Show all make targets
 ```
+
+---
+
+## 📊 Deployed Services
+
+| Service | Type | URL | Protection |
+|---------|------|-----|------------|
+| **Verly Service** | Public API | https://api.verlyvidracaria.com | WAF + Rate Limit + CrowdSec + Headers |
+| **Grafana** | Dashboard | http://grafana.192.168.0.2.nip.io | None (LAN only) |
+| **Prometheus** | Metrics | http://prometheus.192.168.0.2.nip.io | None (LAN only) |
+| **Redash** | Data Viz | http://redash.192.168.0.2.nip.io | None (LAN only) |
+| **Dozzle** | Logs | http://dozzle.192.168.0.2.nip.io | None (LAN only) |
+| **Portainer** | Docker UI | http://portainer.192.168.0.2.nip.io | None (LAN only) |
 
 ---
 
 ## 📚 Documentation
 
 ### Main Guides
-- [📐 Architecture](docs/architecture.md) - Diagram and infrastructure overview
-- [🍊 ARM64 Compatibility](docs/arm64-compatibility.md) - ARM64 specific guide
-- [🔐 SOPS Guide](docs/sops-guide.md) - How to manage secrets
-- [☕ Java 21 Template](docs/java21-spring-boot-template.md) - Complete CI/CD template
-- [🔄 CI/CD Comparison](docs/ci-cd-comparison.md) - Hybrid vs Self-hosted
-- [💾 Disaster Recovery](docs/disaster-recovery.md) - Backup and restore
-- [📖 Runbook](docs/runbook.md) - Operational procedures
+- [Architecture](docs/architecture.md) - System design and layer organization
+- [Security Layers](docs/security-layers.md) - Defense in depth explanation
+- [Adding Applications](docs/adding-applications.md) - Step-by-step guide for new apps
+- [Network Topology](docs/network-topology.md) - Network diagrams and connections
 
-### Templates
-- [Java 21 + Spring Boot](stacks/template-java21/) - Complete reusable template
+### Stack Documentation
+- [Security Layer](stacks/security/README.md) - Traefik, WAF, CrowdSec
+- [Infrastructure Layer](stacks/infrastructure/README.md) - PostgreSQL, Redis
+- [Observability Layer](stacks/observability/README.md) - Monitoring tools
+- [Applications Layer](stacks/applications/README.md) - Application deployment
 
 ---
 
@@ -108,134 +194,82 @@ make verify-arm64            # Verify ARM64 compatibility
 Secrets are encrypted with **SOPS** and safe to commit to Git.
 
 ```bash
-# Edit secrets (automatically decrypts in editor)
+# View secrets (decrypt temporarily)
+sops --decrypt ansible/group_vars/production/secrets.yml
+
+# Edit secrets (auto-encrypts on save)
 sops ansible/group_vars/production/secrets.yml
 
 # Verify it's encrypted
 head ansible/group_vars/production/secrets.yml
-# postgres_password: ENC[AES256_GCM,data:xR7...]  ✅
-
-# Safe commit
-git add ansible/group_vars/production/secrets.yml
-git commit -m "Update secrets"
+# verly_db_password: ENC[AES256_GCM,data:xR7...]  ✅
 ```
 
 **No plaintext secrets in Git!** 🔒
 
 ---
 
-## 🧃 Template: Java 21 + Spring Boot 3.2.5
+## 🎨 Beautiful Portainer UI
 
-Battle-tested template to create new applications with complete CI/CD:
+All stacks and services are beautifully organized in Portainer with:
+- 🏷️ Descriptive labels and categories
+- 📊 Resource usage statistics
+- 🛡️ Security status indicators
+- 📈 Health check status
+- 🔗 Layer organization
 
-### Tech Stack
-- Java 21 (Eclipse Temurin)
-- Spring Boot 3.2.5
-- Maven with optimized cache
-- Docker multi-stage build with layers
-- Native ARM64
-- Robust health checks
-- Automatic rollback
+Access Portainer: `http://portainer.192.168.0.2.nip.io`
 
-### Two CI/CD Options
+---
 
-#### 🔀 Hybrid (Default)
-```yaml
-test, build, docker: ubuntu-latest (GitHub)
-deploy: self-hosted (Orange Pi)
-```
-✅ Fast builds
-✅ Doesn't overload Orange Pi
-✅ 2000 min/month free
-✅ Complete visual feedback on GitHub
+## 🛠️ Infrastructure Details
 
-#### 🏠 Full Self-hosted
-```yaml
-test, build, docker, deploy: self-hosted (Orange Pi)
-```
-✅ 100% privacy
-✅ Unlimited minutes
-✅ Persistent Maven cache
-✅ Identical visual feedback on GitHub
+### Networks (All Encrypted with IPSec)
+- `traefik_public` - Public-facing traffic
+- `security_internal` - Security components (Traefik ↔ CrowdSec)
+- `postgresql_network` - Database access (apps ↔ PostgreSQL)
+- `redis_network` - Cache access (apps ↔ Redis)
+- `monitoring_net` - Metrics collection (Prometheus ↔ apps)
 
-**Important:** Both options have **identical visual feedback** on GitHub Actions! The choice is only where the code runs.
-
-See: [docs/ci-cd-comparison.md](docs/ci-cd-comparison.md)
+### Volumes
+- `postgresql_data` - Database (CRITICAL - daily backups)
+- `traefik_acme` - SSL certificates
+- `grafana_data` - Dashboards
+- `prometheus_data` - Metrics (30d retention)
+- `crowdsec_data` - Threat intelligence
+- `portainer_data` - Docker UI settings
 
 ---
 
 ## 📊 Performance
 
-**Typical CI/CD:**
+**Typical CI/CD Pipeline:**
 - Test: ~2min
 - Build: ~1min
 - Docker build: ~2min
 - Deploy + health: ~1min
 - **Total: 4-6min** from push to live ⚡
 
-**Spring Boot startup (ARM64):**
+**Spring Boot Startup (ARM64):**
 - Cold start: ~35s
 - Health ready: ~40s
 
----
-
-## 🛠️ Infrastructure
-
-### Networks
-- `traefik_public` - Public exposed network
-- `security_internal` - Internal network (CrowdSec, etc)
-- Other overlay networks per stack
-
-### Main Volumes
-- `postgresql_data` - Database
-- `traefik_acme` - SSL certificates
-- `grafana_data` - Dashboards
-- `prometheus_data` - Metrics
-- `crowdsec_data` - Security data
-
-### Firewall (UFW)
-```
-22/tcp    - SSH (LAN only)
-80/tcp    - HTTP Traefik
-443/tcp   - HTTPS Traefik
-53        - DNS AdGuard
-3000/tcp  - Grafana (LAN only)
-9000/tcp  - Portainer (LAN only)
-```
+**WAF Performance:**
+- Coraza WASM: ~5ms overhead
+- 23x faster than standalone ModSecurity
 
 ---
 
 ## 🔄 Disaster Recovery
 
 ```bash
-# Complete backup
+# Backup all volumes
 make backup
 # → /home/matt/backups/orange-juice-box/YYYY-MM-DD_HHMMSS/
 
-# Restore (documented in docs/disaster-recovery.md)
+# Restore from backup
 ./scripts/restore-volumes.sh /path/to/backup
 ```
-
----
-
-## 🎓 How to Create New Application
-
-```bash
-# 1. Copy template
-cp -r stacks/template-java21 ~/my-new-app/.github
-
-# 2. Adjust variables (SERVICE_NAME, HEALTH_URL)
-vim ~/my-new-app/.github/workflows/ci-cd-hybrid.yml
-
-# 3. Add to orange-juice-box
-mkdir stacks/my-new-app
-# ... create docker-compose.yml
-
-# 4. Push and automatic deploy!
-git push origin main
-```
-
-See: [docs/java21-spring-boot-template.md](docs/java21-spring-boot-template.md)
 
 ---
 
@@ -261,11 +295,13 @@ Developed with ❤️ for Orange Pi ARM64
 
 **Technologies:**
 - Docker Swarm
+- Traefik v3
+- Coraza WAF (WASM)
+- CrowdSec
 - Ansible
 - SOPS (Mozilla)
-- Traefik
-- CrowdSec
 - Prometheus + Grafana
+- Redash
 - Spring Boot
 
 ---
@@ -274,7 +310,6 @@ Developed with ❤️ for Orange Pi ARM64
 
 - **Issues**: https://github.com/matttoledo/orange-juice-box/issues
 - **Documentation**: [docs/](docs/)
-- **Runbook**: [docs/runbook.md](docs/runbook.md)
 
 ---
 

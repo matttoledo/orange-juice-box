@@ -1,0 +1,95 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'orange-juice-box'
+    environment: 'production'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # - alertmanager:9093
+
+# Load rules
+rule_files:
+  - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # ========================================
+  # Prometheus itself
+  # ========================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          layer: 'observability'
+          component: 'metrics'
+
+  # ========================================
+  # Traefik metrics
+  # ========================================
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+        labels:
+          layer: 'security'
+          component: 'reverse-proxy'
+
+  # ========================================
+  # Verly Service (Spring Boot Actuator)
+  # ========================================
+  - job_name: 'verly-service'
+    metrics_path: '/verly-service/actuator/prometheus'
+    static_configs:
+      - targets: ['verly-service:8080']
+        labels:
+          layer: 'applications'
+          component: 'rest-api'
+          app: 'verly'
+
+  # ========================================
+  # PostgreSQL Exporter (if installed)
+  # ========================================
+  # - job_name: 'postgresql'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #       labels:
+  #         layer: 'infrastructure'
+  #         component: 'database'
+
+  # ========================================
+  # cAdvisor - Container metrics
+  # ========================================
+  - job_name: 'cadvisor'
+    dns_sd_configs:
+      - names:
+          - 'tasks.cadvisor'
+        type: 'A'
+        port: 8080
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: instance
+
+  # ========================================
+  # Node Exporter - Host metrics
+  # ========================================
+  - job_name: 'node-exporter'
+    dns_sd_configs:
+      - names:
+          - 'tasks.node-exporter'
+        type: 'A'
+        port: 9100
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: instance
+
+  # ========================================
+  # Docker Swarm discovery (experimental)
+  # ========================================
+  # - job_name: 'docker-swarm'
+  #   dockerswarm_sd_configs:
+  #     - host: unix:///var/run/docker.sock
+  #       role: tasks

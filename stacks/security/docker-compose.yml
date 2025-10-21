@@ -1,0 +1,281 @@
+version: '3.8'
+
+networks:
+  traefik_public:
+    external: true
+    name: traefik_public
+  security_internal:
+    driver: overlay
+    attachable: true
+
+volumes:
+  traefik_acme:
+  traefik_logs:
+  crowdsec_config:
+  crowdsec_data:
+  crowdsec_dashboard:
+
+services:
+  # ========================================
+  # TRAEFIK - Reverse Proxy com Segurança
+  # ========================================
+  traefik:
+    image: traefik:v3.1
+    command:
+      # API e Dashboard
+      - --api.dashboard=true
+      - --api.insecure=false
+
+      # Logs
+      - --log.level=INFO
+      - --accesslog=true
+      - --accesslog.filepath=/var/log/traefik/access.log
+      - --accesslog.format=json
+
+      # Providers
+      - --providers.swarm=true
+      - --providers.swarm.endpoint=unix:///var/run/docker.sock
+      - --providers.swarm.exposedbydefault=false
+      - --providers.swarm.network=traefik_public
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+
+      # Entrypoints
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.internal.address=:8081
+      # REMOVIDO: redirect global HTTP->HTTPS (causava loop com Cloudflare Tunnel)
+      # Cada serviço deve configurar seu próprio redirect se necessário
+      # NOTA: entrypoint 'internal' (8081) é usado para apps protegidos pelo WAF
+
+      # SSL/TLS
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+
+      # Segurança
+      - --entrypoints.websecure.http.tls=true
+      - --entrypoints.websecure.http.tls.certResolver=letsencrypt
+
+      # Metrics para monitoramento
+      - --metrics.prometheus=true
+      - --metrics.prometheus.addEntryPointsLabels=true
+      - --metrics.prometheus.addServicesLabels=true
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/config:/etc/traefik/dynamic:ro
+      - traefik_logs:/var/log/traefik
+      - traefik_acme:/letsencrypt
+
+    networks:
+      - traefik_public
+      - security_internal
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        # Dashboard do Traefik
+        - traefik.enable=true
+        - traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)
+        - traefik.http.routers.traefik-dashboard.entrypoints=websecure
+        - traefik.http.routers.traefik-dashboard.service=api@internal
+        - traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt
+
+        # Middleware de autenticação (altere usuário/senha)
+        - traefik.http.routers.traefik-dashboard.middlewares=auth-dashboard,security-headers,rate-limit
+        - traefik.http.middlewares.auth-dashboard.basicauth.users=${TRAEFIK_AUTH}
+
+        # Middlewares de segurança globais
+        - traefik.http.middlewares.security-headers.headers.frameDeny=true
+        - traefik.http.middlewares.security-headers.headers.sslRedirect=true
+        - traefik.http.middlewares.security-headers.headers.stsSeconds=31536000
+        - traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true
+        - traefik.http.middlewares.security-headers.headers.stsPreload=true
+        - traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true
+        - traefik.http.middlewares.security-headers.headers.browserXssFilter=true
+        - traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin
+        - traefik.http.middlewares.security-headers.headers.permissionsPolicy=camera=(), microphone=(), geolocation=()
+
+        # Rate limiting agressivo
+        - traefik.http.middlewares.rate-limit.ratelimit.average=100
+        - traefik.http.middlewares.rate-limit.ratelimit.burst=50
+        - traefik.http.middlewares.rate-limit.ratelimit.period=1m
+
+        # Rate limiting para APIs (mais restritivo)
+        - traefik.http.middlewares.rate-limit-api.ratelimit.average=50
+        - traefik.http.middlewares.rate-limit-api.ratelimit.burst=25
+        - traefik.http.middlewares.rate-limit-api.ratelimit.period=1m
+
+        # ========================================
+        # MIDDLEWARE CHAINS - Proteção Automática
+        # ========================================
+        # Usar em apps: traefik.http.routers.APP.middlewares=global-api-security@swarm
+        # NOTA: WAF removido temporariamente (requer mudança arquitetural)
+
+        # Chain para APIs públicas: CrowdSec + Headers + Rate Limit estrito
+        - traefik.http.middlewares.global-api-security.chain.middlewares=crowdsec-bouncer@swarm,security-headers@swarm,rate-limit-api@swarm
+
+        # Chain para dashboards: CrowdSec + Headers + Rate Limit normal
+        - traefik.http.middlewares.global-security.chain.middlewares=crowdsec-bouncer@swarm,security-headers@swarm,rate-limit@swarm
+
+        # Chain leve: Apenas Headers + Rate Limit (para serviços internos confiáveis)
+        - traefik.http.middlewares.global-security-lite.chain.middlewares=security-headers@swarm,rate-limit@swarm
+
+        # IP Whitelist para dashboard (adicione seus IPs confiáveis)
+        # - traefik.http.middlewares.ip-whitelist.ipwhitelist.sourcerange=192.168.0.0/16,10.0.0.0/8
+
+        - traefik.http.services.traefik-dashboard.loadbalancer.server.port=8080
+
+  # ========================================
+  # CROWDSEC - Engine de Detecção de Ameaças
+  # ========================================
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    environment:
+      # Coleções de proteção (adicione mais conforme necessário)
+      - COLLECTIONS=crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/whitelist-good-actors crowdsecurity/iptables crowdsecurity/linux crowdsecurity/sshd crowdsecurity/nginx
+      - GID=1000
+      - DISABLE_ONLINE_API=false
+      - BOUNCER_KEY_TRAEFIK=${CROWDSEC_BOUNCER_KEY}
+
+    volumes:
+      - crowdsec_config:/etc/crowdsec
+      - crowdsec_data:/var/lib/crowdsec/data
+      - /var/log:/var/log:ro
+
+    networks:
+      - security_internal
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  # ========================================
+  # CROWDSEC BOUNCER - Bloqueador para Traefik
+  # ========================================
+  bouncer-traefik:
+    image: fbonalair/traefik-crowdsec-bouncer:latest
+    environment:
+      - CROWDSEC_BOUNCER_API_KEY=${CROWDSEC_BOUNCER_KEY}
+      - CROWDSEC_AGENT_HOST=crowdsec:8080
+      - GIN_MODE=release
+
+    networks:
+      - security_internal
+      - traefik_public
+
+    depends_on:
+      - crowdsec
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        # Middleware do CrowdSec para aplicar em todas as rotas
+        - traefik.enable=true
+        - traefik.http.middlewares.crowdsec-bouncer.forwardauth.address=http://bouncer-traefik:8080/api/v1/forwardAuth
+        - traefik.http.middlewares.crowdsec-bouncer.forwardauth.trustForwardHeader=true
+        - traefik.http.services.bouncer-traefik.loadbalancer.server.port=8080
+
+  # ========================================
+  # CROWDSEC DASHBOARD - Interface de Monitoramento
+  # ========================================
+  crowdsec-dashboard:
+    image: metabase/metabase:latest
+    environment:
+      - MB_DB_FILE=/metabase-data/metabase.db
+      - MGID=1000
+
+    volumes:
+      - crowdsec_dashboard:/metabase-data
+      - crowdsec_data:/crowdsec-db:ro  # Banco do CrowdSec em modo somente leitura
+
+    networks:
+      - security_internal
+      - traefik_public
+
+    depends_on:
+      - crowdsec
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.crowdsec-dashboard.rule=Host(`crowdsec.192.168.0.2.nip.io`)
+        - traefik.http.routers.crowdsec-dashboard.entrypoints=web
+        - traefik.http.services.crowdsec-dashboard.loadbalancer.server.port=3000
+
+  # ========================================
+  # MODSECURITY - Web Application Firewall
+  # ========================================
+  modsecurity:
+    image: owasp/modsecurity-crs:nginx-alpine
+    environment:
+      - BACKEND=http://traefik:8081
+      - PORT=8080
+      - PARANOIA=2
+      - BLOCKING_PARANOIA=2
+      - ALLOWED_METHODS=GET HEAD POST OPTIONS PUT PATCH DELETE
+      - PROXY_TIMEOUT=60s
+      - TIMEOUT=60s
+      - BACKEND_WS=ws://traefik:8081
+    volumes:
+      - ./modsecurity/logs:/var/log/modsec
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - traefik_public
+      - security_internal
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+      labels:
+        - traefik.enable=true
+        - traefik.http.services.modsecurity.loadbalancer.server.port=8080
+        - traefik.http.middlewares.waf.forwardauth.address=http://modsecurity:8080
+        - traefik.http.middlewares.waf.forwardauth.trustForwardHeader=true
+
+  # ========================================
+  # WHOAMI - App de teste (REMOVA em produção)
+  # ========================================
+  whoami:
+    image: traefik/whoami:latest
+    networks:
+      - traefik_public
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.whoami.rule=Host(`whoami.${DOMAIN}`)
+        - traefik.http.routers.whoami.entrypoints=websecure
+        - traefik.http.routers.whoami.tls.certresolver=letsencrypt
+        # APLICA PROTEÇÕES BÁSICAS
+        - traefik.http.routers.whoami.middlewares=security-headers@docker
+        - traefik.http.services.whoami.loadbalancer.server.port=80

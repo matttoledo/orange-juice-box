@@ -1,0 +1,34 @@
+# ========================================
+# CROWDSEC ACQUISITION CONFIG
+# Define quais logs o CrowdSec deve monitorar
+# ========================================
+
+# Logs do Traefik (formato JSON)
+filenames:
+  - /var/log/traefik/access.log
+labels:
+  type: traefik
+
+---
+
+# Logs de autenticação SSH (protege acesso SSH ao servidor)
+filenames:
+  - /var/log/auth.log
+labels:
+  type: syslog
+
+---
+
+# Logs do sistema (kernel, daemons, etc)
+filenames:
+  - /var/log/syslog
+labels:
+  type: syslog
+
+---
+
+# Logs do Nginx (se você tiver algum container nginx)
+filenames:
+  - /var/log/nginx/*.log
+labels:
+  type: nginx

@@ -1,0 +1,140 @@
+http:
+  middlewares:
+    # ========================================
+    # WAF - Coraza WASM Plugin (OWASP CRS)
+    # ========================================
+    # NOTE: Requires Traefik v3 with experimental plugins enabled
+    # 23x faster than standalone ModSecurity
+    waf-coraza:
+      plugin:
+        coraza:
+          directives:
+            - "SecRuleEngine On"
+            - "SecRequestBodyAccess On"
+            - "SecResponseBodyAccess Off"
+            - "SecDefaultAction \"phase:1,log,auditlog,pass\""
+            - "SecDefaultAction \"phase:2,log,auditlog,deny,status:403\""
+            # Include OWASP Core Rule Set
+            - "Include @owasp_crs/crs-setup.conf.example"
+            - "Include @owasp_crs/rules/*.conf"
+            # Set paranoia level (1=basic, 2=moderate, 3=strict, 4=paranoid)
+            - "SecAction \"id:900000,phase:1,nolog,pass,t:none,setvar:tx.paranoia_level=2\""
+
+    # ========================================
+    # RATE LIMITING - DDoS Protection
+    # ========================================
+    # Strict rate limit for public APIs
+    rate-limit-strict:
+      rateLimit:
+        average: 50      # 50 requests per minute
+        burst: 25        # Burst of 25 additional requests
+        period: 1m
+
+    # ========================================
+    # SECURITY HEADERS - XSS, Clickjacking, etc
+    # ========================================
+    security-headers-public:
+      headers:
+        # Prevent clickjacking
+        frameDeny: true
+
+        # Force HTTPS
+        sslRedirect: true
+        sslForceHost: true
+
+        # HSTS - Force HTTPS for 1 year
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+
+        # Prevent MIME sniffing
+        contentTypeNosniff: true
+
+        # XSS Protection (browser-level)
+        browserXssFilter: true
+
+        # Referrer policy
+        referrerPolicy: "strict-origin-when-cross-origin"
+
+        # Content Security Policy
+        contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"
+
+        # Permissions Policy
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), accelerometer=(), gyroscope=()"
+
+        # Remove server information headers
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+
+        # Add custom request headers
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+
+    # ========================================
+    # AUTO-PROTECTION CHAIN
+    # ========================================
+    # Use this for ALL public-facing applications (internet-exposed)
+    # Usage: traefik.http.routers.APP.middlewares=auto-public-protection@file
+    #
+    # Protection flow:
+    #   Internet → WAF (Coraza) → Rate Limit → CrowdSec → Headers → App
+    #
+    # This provides:
+    #   ✅ WAF protection (OWASP CRS - SQLi, XSS, RCE, LFI, etc)
+    #   ✅ Rate limiting (50/min, burst 25)
+    #   ✅ CrowdSec IP blocking (17,000+ malicious IPs)
+    #   ✅ Security headers (HSTS, CSP, XSS, Clickjacking)
+    #
+    auto-public-protection:
+      chain:
+        middlewares:
+          - waf-coraza                    # 1. WAF first (blocks attacks)
+          - rate-limit-strict             # 2. Rate limiting (DDoS protection)
+          - crowdsec-bouncer@swarm        # 3. CrowdSec (IP reputation)
+          - security-headers-public       # 4. Security headers (browser protection)
+
+    # ========================================
+    # UTILITY MIDDLEWARES
+    # ========================================
+    # Compression
+    compress:
+      compress: {}
+
+    # HTTPS redirect
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    # Circuit breaker (auto-disable failing backends)
+    circuit-breaker:
+      circuitBreaker:
+        expression: "NetworkErrorRatio() > 0.5 || ResponseCodeRatio(500, 600, 0, 600) > 0.3"
+
+    # Retry on failure
+    retry:
+      retry:
+        attempts: 3
+        initialInterval: 100ms
+
+    # Request buffering (protect backend from large requests)
+    buffer:
+      buffering:
+        maxRequestBodyBytes: 10485760   # 10MB
+        memRequestBodyBytes: 2097152    # 2MB
+        maxResponseBodyBytes: 10485760  # 10MB
+        memResponseBodyBytes: 2097152   # 2MB
+
+# ========================================
+# NOTE: Internal Apps (LAN-only)
+# ========================================
+# Internal apps (Grafana, Prometheus, Redash, Portainer, Dozzle) have:
+#   - NO middlewares at all!
+#   - Protection via: UFW firewall + .nip.io domain restriction
+#   - Maximum simplicity and performance
+#
+# Example:
+#   traefik.http.routers.grafana.rule=Host(`grafana.192.168.0.2.nip.io`)
+#   # No middlewares line!
+#

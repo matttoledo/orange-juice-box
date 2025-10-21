@@ -1,296 +1,581 @@
-# 🏗️ Orange Juice Box - Arquitetura
+# 🏗️ Orange Juice Box - Architecture
 
-## Visão Geral
+## Overview
 
-Orange Juice Box é a infraestrutura completa rodando em um Orange Pi 5 Plus com Docker Swarm, otimizada para ARM64.
+Orange Juice Box is a complete homelab infrastructure running on Orange Pi 5 Pro with Docker Swarm, organized in secure layers with modern WAF protection.
+
+---
+
+## System Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        INTERNET                                     │
-│                           │                                         │
-│                    ┌──────▼──────┐                                  │
-│                    │  Cloudflare │                                  │
-│                    │   Tunnel    │                                  │
-│                    └──────┬──────┘                                  │
-└───────────────────────────┼─────────────────────────────────────────┘
-                            │
-                     ┌──────▼──────┐
-                     │   Traefik   │ :80, :443
-                     │   (v3.1)    │
-                     └──────┬──────┘
-                            │
-            ┌───────────────┼───────────────┐
-            │               │               │
-      ┌─────▼─────┐   ┌────▼────┐    ┌────▼────┐
-      │ CrowdSec  │   │   Verly │    │ Grafana │
-      │  Bouncer  │   │ Service │    │Dashboard│
-      └─────┬─────┘   └────┬────┘    └────┬────┘
-            │              │              │
-      ┌─────▼─────┐   ┌────▼────┐    ┌────▼────┐
-      │ CrowdSec  │   │PostgreSQL│   │Prometheus│
-      │  Engine   │   └─────────┘    └────┬────┘
-      └───────────┘                        │
-                                      ┌────▼────┐
-                                      │cAdvisor │
-                                      │  Node   │
-                                      │Exporter │
-                                      └─────────┘
+│                         INTERNET                                     │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                      ┌────────▼────────┐
+                      │  Cloudflare     │
+                      │  Tunnel         │
+                      └────────┬────────┘
+                               │
+                ┌──────────────▼──────────────┐
+                │  Security Layer             │
+                │  ┌────────────────────────┐ │
+                │  │  Coraza WAF (WASM)    │ │ ← OWASP CRS (PUBLIC apps only)
+                │  └──────────┬─────────────┘ │
+                │  ┌──────────▼─────────────┐ │
+                │  │  Rate Limiting        │ │ ← 50/min (PUBLIC apps only)
+                │  └──────────┬─────────────┘ │
+                │  ┌──────────▼─────────────┐ │
+                │  │  CrowdSec Bouncer     │ │ ← 17k+ IPs (PUBLIC apps only)
+                │  └──────────┬─────────────┘ │
+                │  ┌──────────▼─────────────┐ │
+                │  │  Traefik v3 (Router)  │ │
+                │  └──────────┬─────────────┘ │
+                └─────────────┼───────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+┌─────────▼──────┐  ┌─────────▼─────────┐  ┌─────▼───────────┐
+│ Applications   │  │ Observability     │  │ Infrastructure  │
+│ (Public)       │  │ (LAN only)        │  │ (Backend)       │
+│                │  │                   │  │                 │
+│ ┌────────────┐ │  │ ┌─────────────┐  │  │ ┌─────────────┐ │
+│ │ Verly      │ │  │ │  Grafana    │  │  │ │ PostgreSQL  │ │
+│ │ Service    │ │  │ │  Prometheus │  │  │ │     16      │ │
+│ │            │ │  │ │  Redash     │  │  │ │             │ │
+│ │ (WAF ✅)   │ │  │ │  Dozzle     │  │  │ └──────▲──────┘ │
+│ │ (RL ✅)    │ │  │ │  Portainer  │  │  │        │        │
+│ └─────┬──────┘ │  │ └─────────────┘  │  │ ┌──────┴──────┐ │
+│       │        │  │ (NO middlewares) │  │ │   Redis 7   │ │
+│       │        │  │                  │  │ └─────────────┘ │
+└───────┼────────┘  └──────────────────┘  └─────────────────┘
+        │
+        │ postgresql_network (encrypted)
+        └───────────────────────────────────────────►
 ```
 
 ---
 
-## 🐳 Docker Swarm Topology
+## Layer Organization
+
+### Security Layer
+**Stack Name:** `security`
+
+**Services:**
+- **Traefik** - Reverse proxy and router (v3.1)
+- **CrowdSec** - Threat detection engine
+- **CrowdSec Bouncer** - IP blocking middleware
+- **CrowdSec Dashboard** - Security analytics (Metabase)
+
+**Networks:**
+- `traefik_public` - Public-facing traffic
+- `security_internal` - Security components communication
+
+**Protection Flow (Public Apps):**
+```
+Request → Traefik → Coraza WAF → Rate Limit → CrowdSec → Headers → App
+```
+
+---
+
+### Infrastructure Layer
+**Stack Name:** `infrastructure`
+
+**Services:**
+- **PostgreSQL 16** - Shared database server
+- **Redis 7** - Caching and message broker
+
+**Networks:**
+- `postgresql_network` (encrypted with IPSec)
+- `redis_network` (encrypted with IPSec)
+
+**Clients:**
+- Verly Service → PostgreSQL (verly_db)
+- Redash → PostgreSQL (redash metadata db + verly_db queries)
+- Redash → Redis (caching)
+
+---
+
+### Observability Layer
+**Stack Name:** `observability`
+
+**Services:**
+- **Grafana** - Monitoring dashboards
+- **Prometheus** - Metrics collection and time-series database
+- **Redash** - Data visualization and business intelligence
+- **Redash Worker** - Background query processor
+- **Dozzle** - Real-time Docker logs viewer
+- **Portainer** - Docker Swarm management UI
+- **cAdvisor** - Container metrics (global mode)
+- **Node Exporter** - Host system metrics (global mode)
+
+**Networks:**
+- `traefik_public` - Web access (LAN only)
+- `monitoring_net` (encrypted) - Metrics collection
+- `postgresql_network` - Redash database access
+- `redis_network` - Redash cache
+
+**Protection:** None (LAN-only access, no middlewares)
+
+---
+
+### Applications Layer
+**Stack Name:** `verly` (and others)
+
+**Services:**
+- **Verly Service** - Spring Boot REST API (Java 21)
+- _(Add your applications here)_
+
+**Networks:**
+- `traefik_public` - Public access
+- `postgresql_network` - Database access
+- `monitoring_net` - Prometheus metrics
+
+**Protection (Public Apps):** Full stack (WAF + Rate Limit + CrowdSec + Headers)
+
+---
+
+## Network Topology
+
+### All Networks (Encrypted with IPSec)
 
 ```
-Orange Pi 5 Plus (Manager + Worker)
+traefik_public (overlay, encrypted)
+├── Traefik
+├── Verly Service          [PUBLIC - Full protection]
+├── Grafana                [LAN - No middlewares]
+├── Prometheus             [LAN - No middlewares]
+├── Redash                 [LAN - No middlewares]
+├── Dozzle                 [LAN - No middlewares]
+├── Portainer              [LAN - No middlewares]
+└── CrowdSec Dashboard     [LAN - No middlewares]
+
+security_internal (overlay, encrypted)
+├── Traefik
+├── CrowdSec
+└── CrowdSec Bouncer
+
+postgresql_network (overlay, encrypted)
+├── PostgreSQL
+├── Verly Service
+└── Redash
+
+redis_network (overlay, encrypted)
+├── Redis
+└── Redash
+
+monitoring_net (overlay, encrypted)
+├── Prometheus
+├── Grafana
+├── Redash
+├── Verly Service
+├── cAdvisor (global)
+└── Node Exporter (global)
+```
+
+---
+
+## Security Layers
+
+### Layer 1: Network Security (UFW Firewall)
+
+```
+Firewall Rules:
+├── SSH (22/tcp):        LAN only (192.168.0.0/24)
+├── HTTP (80/tcp):       Public (Traefik)
+├── HTTPS (443/tcp):     Public (Traefik)
+└── Internal ports:      BLOCKED from internet
+    ├── 3000 (Grafana)
+    ├── 5000 (Redash)
+    ├── 8080 (ModSecurity - unused)
+    ├── 9000 (Portainer)
+    └── 9090 (Prometheus)
+```
+
+### Layer 2: Application Gateway (Traefik + WAF)
+
+**For PUBLIC applications (internet-facing):**
+
+```
+Request Flow:
+  Internet
+    ↓
+  1. Coraza WAF (WASM)         Blocks: SQLi, XSS, RCE, LFI, Path Traversal
+    ↓
+  2. Rate Limiting             Blocks: DDoS, abuse (50/min limit)
+    ↓
+  3. CrowdSec Bouncer          Blocks: Known malicious IPs (17,000+)
+    ↓
+  4. Security Headers          Protects: XSS, Clickjacking, MIME sniffing
+    ↓
+  Application (clean traffic)
+```
+
+**For INTERNAL applications (LAN-only):**
+
+```
+Request Flow:
+  LAN
+    ↓
+  Application (direct, no middlewares)
+```
+
+Protection via:
+- UFW Firewall (blocks external access)
+- Traefik routing (.nip.io domains only)
+- Network segmentation (Docker overlay networks)
+
+### Layer 3: Container Security (OWASP Docker Top 10)
+
+**Public applications have hardening:**
+- ✅ Non-root user (UID 1000)
+- ✅ Read-only filesystem
+- ✅ No capabilities (`cap_drop: ALL`)
+- ✅ No privilege escalation
+- ✅ Resource limits (CPU, memory, PIDs)
+- ✅ Health checks
+
+**Internal applications:**
+- Optional hardening (recommended but not required)
+
+### Layer 4: Application Security
+
+**Verly Service (Spring Boot):**
+- JWT authentication
+- Role-based access control (RBAC)
+- Password hashing (BCrypt)
+- CSRF protection
+- Input validation
+
+---
+
+## Protection Comparison
+
+| Layer | Type | WAF | Rate Limit | CrowdSec | Headers | Hardening |
+|-------|------|-----|------------|----------|---------|-----------|
+| **Applications (Public)** | Internet | ✅ Coraza | ✅ 50/min | ✅ 17k IPs | ✅ Strict | ✅ OWASP |
+| **Observability** | LAN | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Infrastructure** | Backend | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+**Key Insight:** Security is **focused** where it matters (internet-facing apps). Internal apps are **simple** and **fast** (trusted LAN).
+
+---
+
+## Docker Swarm Topology
+
+```
+Orange Pi 5 Pro (Manager + Worker)
 ├── security_traefik (1 replica)
 ├── security_crowdsec (1 replica)
 ├── security_bouncer-traefik (1 replica)
 ├── security_crowdsec-dashboard (1 replica)
-├── security_modsecurity (1 replica)
-├── verly_verly-service (1 replica)
-├── postgresql_postgresql (1 replica)
-├── swarm-monitoring_grafana (1 replica)
-├── swarm-monitoring_prometheus (1 replica)
-├── swarm-monitoring_cadvisor (global)
-├── swarm-monitoring_node-exporter (global)
-├── adguard_adguard (1 replica)
-└── portainer (1 replica)
+├── infrastructure_postgresql (1 replica)
+├── infrastructure_redis (1 replica)
+├── observability_grafana (1 replica)
+├── observability_prometheus (1 replica)
+├── observability_redash (1 replica)
+├── observability_redash-worker (1 replica)
+├── observability_dozzle (1 replica)
+├── observability_portainer (1 replica)
+├── observability_cadvisor (global)
+├── observability_node-exporter (global)
+└── verly_verly-service (1 replica)
 ```
 
 **Placement Constraints:**
-- Manager-only services: Traefik, CrowdSec
-- Global services: cAdvisor, node-exporter
+- Manager-only: Traefik, CrowdSec, PostgreSQL, Portainer
+- Global: cAdvisor, Node Exporter
 
 ---
 
-## 🌐 Networks
+## CI/CD Pipeline
+
+### Verly Service Example
 
 ```
-traefik_public (overlay)
-├── Traefik
-├── Verly Service
-├── Grafana
-├── CrowdSec Dashboard
-├── AdGuard
-└── Portainer
+GitHub Push (prod branch)
+    │
+    ├─ test (GitHub-hosted)          # Maven tests (~2min)
+    ├─ build (GitHub-hosted)         # Maven package (~1min)
+    ├─ docker (GitHub-hosted)        # Build ARM64 image (~2min)
+    │                                # Push to ghcr.io
+    └─ deploy (self-hosted)          # Orange Pi runner
+        ├─ Pull latest image
+        ├─ Update service (zero-downtime)
+        ├─ Wait for healthy
+        └─ Verify HTTP health
+```
 
-security_internal (overlay)
-├── Traefik
-├── CrowdSec
-├── CrowdSec Bouncer
-└── ModSecurity
+**Total Time:** 4-6 minutes from push to production
 
-swarm-monitoring_net (overlay)
-├── Prometheus
-├── Grafana
-├── cAdvisor
-└── node-exporter
+---
 
-postgresql_network (overlay)
-├── PostgreSQL
-└── Verly Service
+## High Availability & Resilience
 
-Outras redes isoladas por stack
+### Health Checks
+All services have robust health checks:
+- Container-level (Docker healthcheck)
+- Load balancer-level (Traefik healthcheck)
+- Application-level (Spring Actuator, etc)
+
+### Update Strategy
+```yaml
+update_config:
+  order: start-first      # New container starts before old stops
+  failure_action: rollback  # Auto-rollback on failure
+  monitor: 60s            # Monitor health for 60s before considering success
+```
+
+**Result:** Zero-downtime deployments with automatic rollback!
+
+### Resource Limits
+All services have CPU/memory limits to prevent resource exhaustion:
+- Limits: Maximum resources allowed
+- Reservations: Guaranteed minimum resources
+- PID limits: Prevents fork bombs
+
+---
+
+## Scalability Path
+
+**Current:** Single-node Swarm (Orange Pi 5 Pro)
+
+**Future:** Multi-node Swarm
+
+```
+Manager Node: Orange Pi 5 Pro
+Worker Nodes: Additional Orange Pi or Raspberry Pi devices
+
+# Add worker node
+docker swarm join --token <worker-token> <manager-ip>:2377
+```
+
+Services will automatically distribute across nodes based on:
+- Placement constraints
+- Resource availability
+- Health status
+
+---
+
+## Best Practices Implemented
+
+✅ Infrastructure as Code (Git versioning)
+✅ Secrets encrypted (SOPS + age)
+✅ Zero-downtime deployments
+✅ Automatic rollback on failure
+✅ Robust health checks
+✅ Complete monitoring (Prometheus + Grafana)
+✅ Security hardening (UFW, SSH, fail2ban)
+✅ Modern WAF (Coraza WASM, 23x faster)
+✅ Defense in depth (multiple security layers)
+✅ Network encryption (IPSec on all overlay networks)
+✅ Container hardening (OWASP Docker Top 10)
+✅ Resource limits (prevent resource exhaustion)
+✅ Separation of concerns (layer-based organization)
+✅ Self-hosted CI/CD (GitHub Actions runner)
+✅ Beautiful UI organization (Portainer labels)
+
+---
+
+## Technology Stack
+
+### Core Infrastructure
+- **OS**: Ubuntu 22.04 LTS ARM64
+- **Container Runtime**: Docker Engine 24.0+
+- **Orchestration**: Docker Swarm
+- **Networking**: Overlay networks with IPSec encryption
+
+### Security Stack
+- **Reverse Proxy**: Traefik v3.1
+- **WAF**: Coraza (WASM plugin, OWASP CRS v4)
+- **IDS/IPS**: CrowdSec v1.6+
+- **Firewall**: UFW (Uncomplicated Firewall)
+
+### Data Stack
+- **Database**: PostgreSQL 16 (Alpine)
+- **Cache**: Redis 7 (Alpine)
+
+### Monitoring Stack
+- **Metrics**: Prometheus
+- **Visualization**: Grafana
+- **Data Analytics**: Redash
+- **Logs**: Dozzle
+- **Management**: Portainer CE
+- **Container Metrics**: cAdvisor
+- **Host Metrics**: Node Exporter
+
+### Application Stack
+- **Framework**: Spring Boot 3.2.5
+- **Language**: Java 21 (Eclipse Temurin)
+- **Build Tool**: Maven
+- **CI/CD**: GitHub Actions
+
+---
+
+## Performance Characteristics
+
+### WAF Performance
+- **Coraza WASM**: ~5ms overhead per request
+- **23x faster** than standalone ModSecurity
+- Native integration with Traefik (no additional container)
+
+### Network Encryption
+- **IPSec overhead**: ~5-10% throughput reduction
+- **Worth it**: Zero Trust security model
+
+### Resource Usage (Typical)
+```
+Service          CPU      Memory
+─────────────────────────────────────
+Traefik          0.1-0.3  128M
+CrowdSec         0.1-0.2  256M
+PostgreSQL       0.2-0.5  512M-1G
+Verly Service    0.3-0.8  384M-768M
+Grafana          0.1-0.3  256M-512M
+Prometheus       0.3-0.6  512M-1G
+Redash           0.4-0.8  512M-1G
+Other services   0.1-0.2  64M-256M
+─────────────────────────────────────
+Total            ~2-4     ~4-7G
+```
+
+**Orange Pi 5 Pro capacity:** 8 cores, 16GB RAM - Plenty of headroom! ✅
+
+---
+
+## Security Model
+
+### Public Applications (Internet-facing)
+```
+Threat Level: HIGH
+Protection: MAXIMUM
+
+Layers:
+1. Network (UFW)
+2. WAF (Coraza - OWASP CRS)
+3. Rate Limiting (DDoS protection)
+4. IDS/IPS (CrowdSec)
+5. Security Headers (Browser protection)
+6. Container Hardening (OWASP)
+7. Application Security (Spring Security)
+```
+
+### Internal Applications (LAN-only)
+```
+Threat Level: LOW
+Protection: MINIMAL
+
+Layers:
+1. Network (UFW - blocks external access)
+2. Physical Security (LAN is physically controlled)
+3. Network Segmentation (Docker overlay networks)
+4. Access Control (Traefik routing to .nip.io only)
+
+No middlewares = Maximum performance! ⚡
 ```
 
 ---
 
-## 🔒 Security Layers
+## Deployment Strategy
 
-### Layer 1: Network (UFW)
-```
-Firewall Rules:
-- SSH: LAN only (192.168.0.0/24)
-- HTTP/HTTPS: Public (80, 443)
-- DNS: Public (53, 853)
-- Dashboards: LAN only (3000, 8888, 9000, 9091)
-```
+### Deploy Order
 
-### Layer 2: Application (Traefik + CrowdSec)
-```
-Request Flow:
-Internet → Traefik → CrowdSec Bouncer → WAF → App
-
-Middlewares:
-- CrowdSec: Block IPs maliciosos
-- Rate Limiting: 100 req/min (geral), 50 req/min (API)
-- Security Headers: HSTS, CSP, X-Frame-Options
-- ModSecurity: WAF OWASP CRS (paranoia level 2)
+```bash
+1. security        # Must be first (provides Traefik)
+   ↓ (wait 15s)
+2. infrastructure  # Must be before apps (provides database)
+   ↓ (wait 10s)
+3. observability   # Can be parallel with apps
+   ↓ (wait 10s)
+4. applications    # Last (depends on infrastructure)
 ```
 
-### Layer 3: Container (Docker)
-```
-- Non-root users
-- Read-only root filesystem (onde possível)
-- Resource limits (CPU, memory)
-- Health checks
+### Update Strategy
+
+**Rolling updates with zero downtime:**
+```yaml
+update_config:
+  parallelism: 1         # Update one container at a time
+  delay: 10s             # Wait 10s between updates
+  failure_action: rollback  # Auto-rollback on failure
+  monitor: 60s           # Monitor for 60s before next update
+  order: start-first     # Start new before stopping old
 ```
 
-### Layer 4: Application (Spring Security + JWT)
-```
-- JWT authentication
-- Role-based access control
-- Password hashing (BCrypt)
-- CSRF protection
-```
+**Result:** Users never see downtime during updates!
 
 ---
 
-## 📊 Monitoring Stack
-
-### Metrics Collection
-```
-Apps → Prometheus ← cAdvisor (container metrics)
-                  ← node-exporter (host metrics)
-                  ← Spring Actuator (app metrics)
-```
-
-### Visualization
-```
-Prometheus → Grafana Dashboards
-          → Alertmanager → Notifications
-```
-
-### Logs
-```
-Containers → Docker logs → Dozzle (web viewer)
-          → CrowdSec (security analysis)
-```
-
----
-
-## 💾 Data Persistence
-
-### Volumes
-```
-postgresql_data              # Database (CRITICAL - backup diário)
-traefik_acme                 # SSL certificates (backup semanal)
-grafana_data                 # Dashboards (backup semanal)
-prometheus_data              # Métricas (30d retention)
-crowdsec_data                # Security data
-adguard_config               # DNS config
-portainer_data               # Portainer settings
-```
+## Disaster Recovery
 
 ### Backup Strategy
 ```
-Diário:   PostgreSQL (automático via cron)
-Semanal:  Traefik ACME, Grafana
-Mensal:   Full backup de todos os volumes
+Daily:   PostgreSQL (automated via cron)
+Weekly:  Traefik ACME, Grafana, Portainer
+Monthly: Full backup of all volumes
 ```
 
----
-
-## 🚀 CI/CD Pipeline
-
-### Verly Service (Exemplo Real)
-```
-GitHub Push (prod)
-    │
-    ├─ test (ubuntu-latest)         # 212 testes em 2min
-    ├─ build (ubuntu-latest)        # Maven package 1min
-    ├─ docker (ubuntu-latest)       # Build ARM64 image 2min
-    │                               # Push para ghcr.io
-    └─ deploy (self-hosted)         # Orange Pi
-        ├─ Pull image
-        ├─ Update service (zero-downtime)
-        ├─ Wait for healthy (Docker health check)
-        ├─ Verify HTTP health (actuator/health)
-        └─ Rollback if failed ✅
-```
-
-**Total:** 4-6 minutos do push ao deploy
-
-Ver: [docs/java21-spring-boot-template.md](docs/java21-spring-boot-template.md)
-
----
-
-## 🍊 ARM64 Considerations
-
-Todas as imagens usam **manifest lists** do Docker Hub que automaticamente detectam ARM64.
-
-### Imagens Verificadas (ARM64 OK)
-- ✅ Traefik v3.1
-- ✅ PostgreSQL 16-alpine
-- ✅ Grafana (oficial)
-- ✅ Prometheus (oficial)
-- ✅ CrowdSec (oficial)
-- ✅ AdGuard Home
-- ✅ Portainer CE
-- ✅ Eclipse Temurin JRE 21
-
-### Performance ARM64
-- Eficiência energética superior
-- Spring Boot: performance similar a x86_64
-- PostgreSQL: performance similar a x86_64
-- Docker build: pode ser mais lento que x86_64 (mas otimizado com cache)
-
-Ver: [docs/arm64-compatibility.md](docs/arm64-compatibility.md)
-
----
-
-## 🔄 Update Strategy
-
-### Stack Updates (Ansible)
+### Recovery Process
 ```bash
-# Atualizar configuração de stack
-make deploy STACK=monitoring
+# Restore volumes
+./scripts/restore-volumes.sh /path/to/backup
 
-# Rollback (Git)
-git revert HEAD
-make deploy STACK=monitoring
+# Re-deploy all layers
+./scripts/deploy-all.sh
+
+# Verify health
+docker service ls
 ```
 
-### Application Updates (CI/CD)
+**RTO (Recovery Time Objective):** < 15 minutes
+**RPO (Recovery Point Objective):** < 24 hours
+
+---
+
+## Monitoring & Observability
+
+### Metrics Collection
+
 ```
-Automático via GitHub Actions:
-- Push para prod → Deploy automático
-- Rollback automático se falhar
-- Zero-downtime (start-first strategy)
+Applications → Prometheus ← cAdvisor (container metrics)
+                          ← Node Exporter (host metrics)
+                          ← Spring Actuator (app metrics)
+                          ← Traefik (proxy metrics)
+```
+
+### Visualization
+
+```
+Prometheus → Grafana Dashboards
+          → Alertmanager → Notifications (future)
+```
+
+### Data Analytics
+
+```
+PostgreSQL (verly_db) → Redash → Business Dashboards
+                               → SQL Queries
+                               → Reports
+```
+
+### Logs
+
+```
+Containers → Docker logs → Dozzle (real-time viewer)
+          → CrowdSec (security analysis - public apps only)
 ```
 
 ---
 
-## 📈 Scalability
+## Next Steps
 
-**Atual:** Single-node Swarm
-**Futuro:** Multi-node Swarm
-```
-Manager Node: Orange Pi 5 Plus
-Worker Nodes: Adicionar novos Orange Pi ou Raspberry Pi
-
-ansible/playbooks/add-worker.yml  # Playbook pronto
-```
+See documentation for:
+- [Security Layers](security-layers.md) - Detailed security documentation
+- [Adding Applications](adding-applications.md) - How to deploy new apps
+- [Network Topology](network-topology.md) - Detailed network diagrams
 
 ---
 
-## 🎯 Best Practices Implementadas
-
-✅ Infrastructure as Code (Git)
-✅ Secrets criptografados (SOPS)
-✅ Zero-downtime deployments
-✅ Rollback automático
-✅ Health checks robustos
-✅ Monitoring completo
-✅ Security hardening (UFW, SSH, CrowdSec)
-✅ Backup automatizado
-✅ CI/CD com GitHub Actions
-✅ Self-hosted runner (ARM64)
-✅ Multi-stage Docker builds com layers
-✅ Resource limits nos containers
-
----
-
-## 📚 Próximos Passos
-
-Ver [docs/runbook.md](docs/runbook.md) para:
-- Procedimentos operacionais
-- Troubleshooting
-- Manutenção rotineira
-- Adição de novos serviços
-- Scaling para multi-node
-
----
-
-**Última atualização:** 2025-10-19
+**Last Updated:** 2025-10-21
+**Version:** 2.0.0 (Layered Architecture)
