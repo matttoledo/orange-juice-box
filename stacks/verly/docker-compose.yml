@@ -7,8 +7,8 @@ services:
       - SPRING_PROFILES_ACTIVE=prod
       - JAVA_OPTS=-Xmx512m -Xms256m
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/verly_db
-      - SPRING_DATASOURCE_USERNAME=verly_db_owner
-      - SPRING_DATASOURCE_PASSWORD=yKEv8rW1ViQB
+      - SPRING_DATASOURCE_USERNAME=${VERLY_DB_USERNAME:-verly_db_owner}
+      - SPRING_DATASOURCE_PASSWORD=${VERLY_DB_PASSWORD}
     networks:
       - traefik_public
       - swarm-monitoring_net
