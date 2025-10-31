@@ -9,10 +9,10 @@
 
 ### Architecture ✅ COMPLETE (v3.0.0)
 - ✅ Migrated from Traefik to Nginx Proxy Manager
-- ✅ 6 clean layers (gateway, waf, security, infrastructure, observability, applications)
+- ✅ 5 clean layers (gateway, security, infrastructure, observability, applications)
 - ✅ 8 security layers active (Defense in Depth)
 - ✅ Cloudflare Tunnel with QUIC protocol
-- ✅ ModSecurity WAF with OWASP CRS v4.19.0
+- ✅ ModSecurity WAF with OWASP CRS v4.19.0 (consolidated in security stack)
 - ✅ All configuration files in place
 - ✅ Zero exposed public ports (IP hidden via tunnel)
 
@@ -84,13 +84,14 @@
 - ✅ Cloudflare Tunnel running (1/1)
 - ✅ Tunnel ID: 18d4763d-f0e7-4447-9799-40bc36858295
 - ✅ 4 connections registered (gig02, gig09, gig10)
-- ✅ Routing: api.verlyvidracaria.com → waf_modsecurity:8080
+- ✅ Routing: api.verlyvidracaria.com → security_modsecurity:8080
 
-### WAF ✅ ACTIVE (100%) **NEW!**
-- ✅ ModSecurity running (1/1)
-- ✅ 837 OWASP CRS rules loaded
+### Security ✅ ACTIVE (100%) **CONSOLIDATED!**
+- ✅ ModSecurity WAF running (1/1) - 837 OWASP CRS rules
+- ✅ CrowdSec IDS/IPS running (1/1) - 58 threat scenarios
 - ✅ Backend: infrastructure_npm
-- ✅ Logs: /var/log/modsec/audit.log
+- ✅ WAF Logs: /var/log/modsec/audit.log
+- ✅ CrowdSec LAPI: http://crowdsec:8080
 
 ### Observability ✅ HEALTHY (100%)
 - ✅ Grafana running (1/1)
@@ -228,11 +229,9 @@ docker exec $(docker ps -qf name=security_crowdsec) cscli decisions list
 **gateway:** 1/1 healthy (100%) ✅
 - ✅ Cloudflare Tunnel
 
-**waf:** 1/1 healthy (100%) ✅
-- ✅ ModSecurity
-
-**security:** 1/1 healthy (100%) ✅
-- ✅ CrowdSec
+**security:** 2/2 healthy (100%) ✅
+- ✅ ModSecurity WAF
+- ✅ CrowdSec IDS/IPS
 
 **infrastructure:** 3/3 healthy (100%) ✅
 - ✅ PostgreSQL 16
@@ -301,9 +300,9 @@ Headroom: ✅ 65% CPU, ✅ 72% RAM available
 ### Architecture Improvements
 ✅ Migrated from Traefik to Nginx Proxy Manager
 ✅ Added dedicated Gateway layer (Cloudflare Tunnel)
-✅ Added dedicated WAF layer (ModSecurity)
-✅ 6 stack organization (was 4)
-✅ 8 security layers (was 5)
+✅ Consolidated security stack (ModSecurity WAF + CrowdSec IDS/IPS)
+✅ 5 stack organization (was 4)
+✅ 8 security layers active (was 5)
 ✅ Score improved from 7/10 to 10/10 (+43%)
 
 ### Security Enhancements
@@ -348,10 +347,9 @@ Headroom: ✅ 65% CPU, ✅ 72% RAM available
 ### Docker Compose Files
 ```
 stacks/gateway/docker-compose.yml           - Cloudflare Tunnel
-stacks/waf/docker-compose.yml              - ModSecurity WAF
-stacks/security/docker-compose.yml          - CrowdSec (Traefik removed)
+stacks/security/docker-compose.yml          - ModSecurity WAF + CrowdSec IDS/IPS
 stacks/infrastructure/docker-compose.yml    - PostgreSQL, Redis, NPM
-stacks/observability/docker-compose.yml     - Grafana, Prometheus, etc
+stacks/observability/docker-compose.yml     - Grafana, Prometheus, Dozzle, Portainer
 stacks/applications/verly-service/docker-compose.yml - Verly API
 ```
 

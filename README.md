@@ -33,15 +33,14 @@
 
 ## 📦 Layer Organization
 
-Infrastructure is organized in **6 clean layers** by responsibility:
+Infrastructure is organized in **5 clean layers** by responsibility:
 
 ```
 stacks/
 ├── gateway/            Gateway Layer - Cloudflare Tunnel
-├── waf/               WAF Layer - ModSecurity OWASP CRS
-├── security/           Security Layer - CrowdSec IDS/IPS (Traefik deprecated)
+├── security/           Security Layer - ModSecurity WAF + CrowdSec IDS/IPS
 ├── infrastructure/     Infrastructure Layer - PostgreSQL, Redis, NPM
-├── observability/      Observability Layer - Grafana, Prometheus, Redash
+├── observability/      Observability Layer - Grafana, Prometheus, Dozzle, Portainer
 └── applications/       Applications Layer - Verly Service + your apps
 ```
 
@@ -50,27 +49,22 @@ stacks/
 
 **Responsibility:** Secure internet gateway via QUIC protocol, no exposed ports, IP hidden
 
-### Layer 2: WAF (Web Application Firewall)
-**Services:** ModSecurity with OWASP CRS v4.19.0 (837 rules)
+### Layer 2: Security
+**Services:** ModSecurity WAF (837 rules OWASP CRS v4.19.0), CrowdSec IDS/IPS
 
-**Responsibility:** Protection against OWASP Top 10 (SQL Injection, XSS, RCE, etc)
+**Responsibility:** WAF protection (SQLi, XSS, RCE), threat detection, IP blocking
 
-### Layer 3: Security
-**Services:** CrowdSec (Threat Detection Engine)
-
-**Responsibility:** IDS/IPS, threat intelligence, automatic IP blocking
-
-### Layer 4: Infrastructure
+### Layer 3: Infrastructure
 **Services:** PostgreSQL 16, Redis 7, Nginx Proxy Manager
 
 **Responsibility:** Reverse proxy, SSL/TLS termination, shared data services
 
-### Layer 5: Observability
-**Services:** Grafana, Prometheus, Redash, Dozzle, Portainer, cAdvisor, Node Exporter
+### Layer 4: Observability
+**Services:** Grafana, Prometheus, Dozzle, Portainer, cAdvisor, Node Exporter
 
 **Responsibility:** Monitoring, metrics, logs, dashboards, container management
 
-### Layer 6: Applications
+### Layer 5: Applications
 **Services:** Verly Service (+ your applications)
 
 **Responsibility:** Business logic, APIs, microservices
@@ -193,7 +187,7 @@ make help                                  # Show all make targets
 | **Dozzle** | Logs | http://dozzle.192.168.0.2.nip.io | LAN only |
 | **Portainer** | Docker UI | http://portainer.192.168.0.2.nip.io | LAN only |
 
-**Active Stacks:** 6 (gateway, waf, security, infrastructure, observability, applications)
+**Active Stacks:** 5 (gateway, security, infrastructure, observability, applications)
 **Total Services:** 17/17 running (100%)
 
 ---
@@ -214,8 +208,7 @@ make help                                  # Show all make targets
 
 ### Stack Documentation
 - [Gateway Layer](stacks/gateway/README.md) - Cloudflare Tunnel
-- [WAF Layer](stacks/waf/README.md) - ModSecurity OWASP CRS
-- [Security Layer](stacks/security/README.md) - CrowdSec IDS/IPS
+- [Security Layer](stacks/security/README.md) - ModSecurity WAF + CrowdSec IDS/IPS
 - [Infrastructure Layer](stacks/infrastructure/README.md) - PostgreSQL, Redis, NPM
 - [Observability Layer](stacks/observability/README.md) - Monitoring tools
 - [Applications Layer](stacks/applications/README.md) - Application deployment
