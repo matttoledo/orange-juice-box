@@ -9,72 +9,126 @@ Orange Juice Box is a complete homelab infrastructure running on Orange Pi 5 Pro
 ## System Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         INTERNET                                     │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                      ┌────────▼────────┐
-                      │  Cloudflare     │
-                      │  Tunnel         │
-                      └────────┬────────┘
-                               │
-                ┌──────────────▼──────────────┐
-                │  Security Layer             │
-                │  ┌────────────────────────┐ │
-                │  │  Coraza WAF (WASM)    │ │ ← OWASP CRS (PUBLIC apps only)
-                │  └──────────┬─────────────┘ │
-                │  ┌──────────▼─────────────┐ │
-                │  │  Rate Limiting        │ │ ← 50/min (PUBLIC apps only)
-                │  └──────────┬─────────────┘ │
-                │  ┌──────────▼─────────────┐ │
-                │  │  CrowdSec Bouncer     │ │ ← 17k+ IPs (PUBLIC apps only)
-                │  └──────────┬─────────────┘ │
-                │  ┌──────────▼─────────────┐ │
-                │  │  Traefik v3 (Router)  │ │
-                │  └──────────┬─────────────┘ │
-                └─────────────┼───────────────┘
-                              │
-          ┌───────────────────┼───────────────────┐
-          │                   │                   │
-┌─────────▼──────┐  ┌─────────▼─────────┐  ┌─────▼───────────┐
-│ Applications   │  │ Observability     │  │ Infrastructure  │
-│ (Public)       │  │ (LAN only)        │  │ (Backend)       │
-│                │  │                   │  │                 │
-│ ┌────────────┐ │  │ ┌─────────────┐  │  │ ┌─────────────┐ │
-│ │ Verly      │ │  │ │  Grafana    │  │  │ │ PostgreSQL  │ │
-│ │ Service    │ │  │ │  Prometheus │  │  │ │     16      │ │
-│ │            │ │  │ │  Redash     │  │  │ │             │ │
-│ │ (WAF ✅)   │ │  │ │  Dozzle     │  │  │ └──────▲──────┘ │
-│ │ (RL ✅)    │ │  │ │  Portainer  │  │  │        │        │
-│ └─────┬──────┘ │  │ └─────────────┘  │  │ ┌──────┴──────┐ │
-│       │        │  │ (NO middlewares) │  │ │   Redis 7   │ │
-│       │        │  │                  │  │ └─────────────┘ │
-└───────┼────────┘  └──────────────────┘  └─────────────────┘
-        │
-        │ postgresql_network (encrypted)
-        └───────────────────────────────────────────►
+┌──────────────────────────────────────────────────────────────────────┐
+│                          INTERNET                                     │
+└─────────────────────────┬────────────────────────────────────────────┘
+                          │
+                 ┌────────▼────────┐
+                 │  Cloudflare CDN │  ← Layer 1: DDoS + Bot Protection
+                 │  + DDoS         │
+                 └────────┬────────┘
+                          │ HTTPS
+                 ┌────────▼────────┐
+                 │  Cloudflare     │  ← Layer 2: Secure Tunnel (QUIC)
+                 │  Tunnel (QUIC)  │     IP Hidden, No Exposed Ports
+                 └────────┬────────┘
+                          │ HTTP (private network)
+         ┌────────────────▼────────────────┐
+         │  Gateway + WAF Layers           │
+         │  ┌────────────────────────────┐ │
+         │  │  ModSecurity WAF          │ │  ← Layer 3: OWASP CRS (837 rules)
+         │  │  OWASP CRS v4.19.0        │ │     Paranoia Level 2
+         │  └────────────┬───────────────┘ │
+         │  ┌────────────▼───────────────┐ │
+         │  │  Nginx Proxy Manager      │ │  ← Layer 4: Reverse Proxy + SSL
+         │  │  (Custom Build)           │ │
+         │  └────────────┬───────────────┘ │
+         │  ┌────────────▼───────────────┐ │
+         │  │  Rate Limiting            │ │  ← Layer 5: 50 req/min (burst 25)
+         │  └────────────┬───────────────┘ │
+         │  ┌────────────▼───────────────┐ │
+         │  │  Security Headers         │ │  ← Layer 6: HSTS, CSP, X-Frame, etc
+         │  └────────────┬───────────────┘ │
+         └───────────────┼─────────────────┘
+                         │
+                ┌────────▼────────┐
+                │  CrowdSec       │  ← Layer 7: IDS/IPS (58 scenarios)
+                │  IDS/IPS        │     Community Threat Intelligence
+                └────────┬────────┘
+                         │
+         ┌───────────────┼───────────────────┐
+         │               │                   │
+┌────────▼──────┐  ┌────▼──────────┐  ┌─────▼───────────┐
+│ Applications  │  │ Observability │  │ Infrastructure  │
+│ (Public)      │  │ (LAN only)    │  │ (Backend)       │
+│               │  │               │  │                 │
+│ ┌───────────┐ │  │ ┌──────────┐ │  │ ┌─────────────┐ │
+│ │  Verly    │ │  │ │ Grafana  │ │  │ │ PostgreSQL  │ │
+│ │  Service  │ │  │ │Prometheus│ │  │ │     16      │ │
+│ │           │ │  │ │  Dozzle  │ │  │ │             │ │
+│ │(8 Layers)│ │  │ │Portainer │ │  │ └──────▲──────┘ │
+│ └─────┬─────┘ │  │ └──────────┘ │  │        │        │
+│       │       │  │(NO protection│  │ ┌──────┴──────┐ │  ← Layer 8
+│       │       │  │  LAN only)   │  │ │   Redis 7   │ │     Network
+└───────┼───────┘  └──────────────┘  └─────────────────┘     Encryption
+        │                                                      (IPSec)
+        │ postgresql_network (IPSec encrypted overlay)
+        └──────────────────────────────────────────────────►
 ```
+
+**Security Score: 10/10** 🏆 (All 8 layers active)
 
 ---
 
 ## Layer Organization
 
+### Gateway Layer
+**Stack Name:** `gateway`
+
+**Services:**
+- **Cloudflare Tunnel** - Secure tunnel using QUIC protocol
+
+**Networks:**
+- `traefik_public` - Connected to all public services
+
+**Configuration:**
+- Tunnel ID: `18d4763d-f0e7-4447-9799-40bc36858295`
+- Protocol: QUIC (HTTP/3 over UDP)
+- Connections: 4 active (failover redundancy)
+- Routing: api.verlyvidracaria.com → waf_modsecurity:8080
+
+---
+
+### WAF Layer
+**Stack Name:** `waf`
+
+**Services:**
+- **ModSecurity** - Web Application Firewall with OWASP CRS v4.19.0
+
+**Configuration:**
+- Rules: 837 active (OWASP Core Rule Set)
+- Paranoia Level: 2 (balanced security vs false positives)
+- Anomaly Threshold: 5 (inbound) / 4 (outbound)
+- Backend: infrastructure_npm:80
+
+**Protection:**
+- SQL Injection (942-* rules)
+- XSS (941-* rules)
+- RCE, LFI/RFI, Path Traversal
+- Scanner Detection, Protocol Violations
+
+---
+
 ### Security Layer
 **Stack Name:** `security`
 
 **Services:**
-- **Traefik** - Reverse proxy and router (v3.1)
-- **CrowdSec** - Threat detection engine
-- **CrowdSec Bouncer** - IP blocking middleware
-- **CrowdSec Dashboard** - Security analytics (Metabase)
+- **CrowdSec** - Threat detection engine (IDS/IPS)
 
 **Networks:**
-- `traefik_public` - Public-facing traffic
+- `traefik_public` - Monitors all public traffic
 - `security_internal` - Security components communication
+
+**Configuration:**
+- Version: v1.7.3
+- Scenarios: 58 active
+- Collections: nginx, http-cve, whitelist-good-actors, linux
+- LAPI: http://crowdsec:8080
 
 **Protection Flow (Public Apps):**
 ```
-Request → Traefik → Coraza WAF → Rate Limit → CrowdSec → Headers → App
+Request → Cloudflare → Tunnel → ModSecurity WAF → NPM → Rate Limit →
+Headers → CrowdSec (monitors) → App
 ```
 
 ---
@@ -85,13 +139,24 @@ Request → Traefik → Coraza WAF → Rate Limit → CrowdSec → Headers → A
 **Services:**
 - **PostgreSQL 16** - Shared database server
 - **Redis 7** - Caching and message broker
+- **Nginx Proxy Manager** - Reverse proxy (custom build: npm-crowdsec-modsec:1.0.0)
+
+**NPM Configuration:**
+- Admin UI: http://192.168.0.2:81
+- Database: PostgreSQL (npm_db)
+- Integrations: CrowdSec bouncer, ModSecurity support
+- SSL/TLS: Let's Encrypt certificates
+- Custom configs: Rate limiting, security headers
 
 **Networks:**
 - `postgresql_network` (encrypted with IPSec)
 - `redis_network` (encrypted with IPSec)
+- `traefik_public` (main routing network)
+- `security_internal` (CrowdSec communication)
 
-**Clients:**
+**Database Clients:**
 - Verly Service → PostgreSQL (verly_db)
+- NPM → PostgreSQL (npm_db)
 - Redash → PostgreSQL (redash metadata db + verly_db queries)
 - Redash → Redis (caching)
 
