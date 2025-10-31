@@ -14,7 +14,7 @@ networks:
 
 services:
   verly-service:
-    image: verly-service:latest
+    image: ghcr.io/verlao/verly-service:latest
 
     # ========================================
     # CONTAINER HARDENING (OWASP Docker Top 10)
@@ -40,8 +40,8 @@ services:
 
       # Database connection
       - SPRING_DATASOURCE_URL=jdbc:postgresql://infrastructure_postgresql:5432/verly_db
-      - SPRING_DATASOURCE_USERNAME=${VERLY_DB_USERNAME:-verly_db_owner}
-      - SPRING_DATASOURCE_PASSWORD=${VERLY_DB_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=verly_db_owner
+      - SPRING_DATASOURCE_PASSWORD=yKEv8rW1ViQB
 
     networks:
       - traefik_public       # Public access via Traefik
@@ -76,27 +76,21 @@ services:
         window: 120s
 
       # ============================================
-      # LABELS (Portainer UI + Traefik Routing)
+      # LABELS (Portainer UI Documentation)
       # ============================================
       labels:
-        # Portainer UI (essential only)
+        # Portainer UI
         - "description=🚀 Verly Service - Public REST API"
         - "category=application"
         - "layer=applications"
+        - "component=rest-api"
         - "exposure=internet"
-        - "protection=ratelimit+crowdsec+headers"
-
-        # Traefik Routing (CRITICAL - DO NOT REMOVE)
-        - "traefik.enable=true"
-        - "traefik.docker.network=traefik_public"
-        - "traefik.http.routers.verly-service.rule=Host(`api.verlyvidracaria.com`)"
-        - "traefik.http.routers.verly-service.entrypoints=websecure"
-        - "traefik.http.routers.verly-service.tls=true"
-        - "traefik.http.routers.verly-service.tls.certresolver=letsencrypt"
-        - "traefik.http.routers.verly-service.middlewares=auto-public-protection@file"
-        - "traefik.http.services.verly-service.loadbalancer.server.port=8080"
-        - "traefik.http.services.verly-service.loadbalancer.healthcheck.path=/verly-service/actuator/health"
-        - "traefik.http.services.verly-service.loadbalancer.healthcheck.interval=30s"
+        - "status=production"
+        - "version=latest"
+        - "domain=api.verlyvidracaria.com"
+        - "protection=npm+ratelimit+ssl"
+        - "database=postgresql"
+        - "monitoring=prometheus"
 
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/verly-service/actuator/health"]
