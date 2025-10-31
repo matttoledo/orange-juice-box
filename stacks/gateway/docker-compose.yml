@@ -1,7 +1,7 @@
 version: '3.8'
 
 networks:
-  traefik_public:
+  public_network:
     external: true
 
 services:
@@ -14,7 +14,7 @@ services:
     command: tunnel run --token ${TUNNEL_TOKEN}
 
     networks:
-      - traefik_public
+      - public_network
 
     deploy:
       mode: replicated

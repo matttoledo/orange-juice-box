@@ -92,7 +92,7 @@ http:
         middlewares:
           # - waf-coraza                  # TODO: Enable after configuring Coraza plugin
           - rate-limit-strict             # 1. Rate limiting (DDoS protection)
-          - crowdsec-bouncer@swarm        # 2. CrowdSec (IP reputation)
+          # - crowdsec-bouncer@swarm      # 2. CrowdSec (IP reputation) - DISABLED for debugging
           - security-headers-public       # 3. Security headers (browser protection)
 
     # ========================================

@@ -20,7 +20,7 @@ version: '3.8'
 # ========================================
 
 networks:
-  traefik_public:
+  public_network:
     external: true
 
   postgresql_network:
@@ -54,7 +54,7 @@ services:
       - APP_ENV=production
 
     networks:
-      - traefik_public
+      - public_network
       # - postgresql_network        # Uncomment if needed
       # - monitoring_net            # Uncomment if needed
 
@@ -100,7 +100,7 @@ services:
         # TRAEFIK ROUTING LABELS
         # ============================================
         - "traefik.enable=true"
-        - "traefik.docker.network=traefik_public"
+        - "traefik.docker.network=public_network"
 
         # Router configuration
         - "traefik.http.routers.my-app.rule=Host(`my-app.verlyvidracaria.com`)"

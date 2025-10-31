@@ -1,7 +1,7 @@
 version: '3.8'
 
 networks:
-  public_network:
+  traefik_public:
     external: true
 
   postgresql_network:
@@ -40,20 +40,20 @@ services:
     image: grafana/grafana:latest
 
     environment:
-      - GF_SERVER_ROOT_URL=http://grafana.192-168-0-2.nip.io
+      - GF_SERVER_ROOT_URL=http://grafana.192.168.0.2.nip.io
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_INSTALL_PLUGINS=
 
     ports:
-      - "3000:3000"  # Direct LAN access only (not routed via Traefik)
+      - "3000:3000"  # Direct access via IP
 
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
 
     networks:
+      - traefik_public
       - monitoring_net
-      - public_network
 
     deploy:
       replicas: 1
@@ -80,8 +80,11 @@ services:
         - "dashboards=10+"
         - "data-sources=prometheus,loki"
 
-        # NOTE: Grafana is LAN-only (no Traefik routing for security)
-        # Access via direct IP: http://192.168.0.2:3000
+        # Traefik routing (NO middlewares!)
+        - "traefik.enable=true"
+        - "traefik.http.routers.grafana.rule=Host(`grafana.192.168.0.2.nip.io`)"
+        - "traefik.http.routers.grafana.entrypoints=web"
+        - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
@@ -112,7 +115,7 @@ services:
 
     networks:
       - monitoring_net
-      - public_network
+      - traefik_public
 
     deploy:
       replicas: 1
@@ -141,7 +144,7 @@ services:
 
         # Traefik routing (NO middlewares!)
         - "traefik.enable=true"
-        - "traefik.http.routers.prometheus.rule=Host(`prometheus.192-168-0-2.nip.io`)"
+        - "traefik.http.routers.prometheus.rule=Host(`prometheus.192.168.0.2.nip.io`)"
         - "traefik.http.routers.prometheus.entrypoints=web"
         - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
 
@@ -180,7 +183,7 @@ services:
       - "5000:5000"  # Direct access via IP
 
     networks:
-      - public_network
+      - traefik_public
       - postgresql_network
       - redis_network
       - monitoring_net
@@ -216,7 +219,7 @@ services:
 
         # Traefik routing (NO middlewares!)
         - "traefik.enable=true"
-        - "traefik.http.routers.redash.rule=Host(`redash.192-168-0-2.nip.io`)"
+        - "traefik.http.routers.redash.rule=Host(`redash.192.168.0.2.nip.io`)"
         - "traefik.http.routers.redash.entrypoints=web"
         - "traefik.http.services.redash.loadbalancer.server.port=5000"
         - "traefik.http.services.redash.loadbalancer.healthcheck.path=/ping"
@@ -373,7 +376,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
     networks:
-      - public_network
+      - traefik_public
 
     deploy:
       replicas: 1
@@ -400,7 +403,7 @@ services:
 
         # Traefik routing (NO middlewares!)
         - "traefik.enable=true"
-        - "traefik.http.routers.dozzle.rule=Host(`dozzle.192-168-0-2.nip.io`)"
+        - "traefik.http.routers.dozzle.rule=Host(`dozzle.192.168.0.2.nip.io`)"
         - "traefik.http.routers.dozzle.entrypoints=web"
         - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
 
@@ -417,7 +420,7 @@ services:
       - portainer_data:/data
 
     networks:
-      - public_network
+      - traefik_public
 
     deploy:
       replicas: 1
@@ -447,7 +450,7 @@ services:
 
         # Traefik routing (NO middlewares!)
         - "traefik.enable=true"
-        - "traefik.http.routers.portainer.rule=Host(`portainer.192-168-0-2.nip.io`)"
+        - "traefik.http.routers.portainer.rule=Host(`portainer.192.168.0.2.nip.io`)"
         - "traefik.http.routers.portainer.entrypoints=web"
         - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 

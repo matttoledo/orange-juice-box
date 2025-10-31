@@ -40,7 +40,7 @@ Environment:
   PROXY_TIMEOUT: 60s
 
 Networks:
-  - traefik_public
+  - public_network
   - security_internal
 
 Replicas: 1

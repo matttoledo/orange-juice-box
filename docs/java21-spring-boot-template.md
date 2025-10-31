@@ -609,7 +609,7 @@ services:
     env_file:
       - .env
     networks:
-      - traefik_public
+      - public_network
       - seu_stack_internal
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider",
@@ -632,10 +632,10 @@ services:
         - traefik.http.routers.seu-app.entrypoints=websecure
         - traefik.http.routers.seu-app.tls.certresolver=letsencrypt
         - traefik.http.services.seu-app.loadbalancer.server.port=8080
-        - traefik.docker.network=traefik_public
+        - traefik.docker.network=public_network
 
 networks:
-  traefik_public:
+  public_network:
     external: true
   seu_stack_internal:
     driver: overlay

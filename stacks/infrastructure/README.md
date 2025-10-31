@@ -71,7 +71,7 @@ docker exec $(docker ps -qf name=infrastructure_redis) redis-cli ping
 
 - `postgresql_network` (encrypted with IPSec)
 - `redis_network` (encrypted with IPSec)
-- `traefik_public` (main routing network)
+- `public_network` (main routing network)
 - `security_internal` (CrowdSec communication)
 
 ---

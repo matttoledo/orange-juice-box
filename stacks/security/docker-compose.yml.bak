@@ -1,9 +1,9 @@
 version: '3.8'
 
 networks:
-  public_network:
+  traefik_public:
     external: true
-    name: public_network
+    name: traefik_public
   security_internal:
     driver: overlay
     attachable: true
@@ -36,7 +36,6 @@ services:
       - --providers.swarm=true
       - --providers.swarm.endpoint=unix:///var/run/docker.sock
       - --providers.swarm.exposedbydefault=false
-      - --providers.swarm.watch=true
       - --providers.swarm.network=traefik_public
       - --providers.file.directory=/etc/traefik/dynamic
       - --providers.file.watch=true
@@ -155,7 +154,6 @@ services:
 
     networks:
       - security_internal
-      - public_network
 
     deploy:
       mode: replicated
@@ -194,10 +192,31 @@ services:
   # ========================================
   # CROWDSEC DASHBOARD - Interface de Monitoramento
   # ========================================
-  # ========================================
-  # CROWDSEC DASHBOARD - REMOVIDO
-  # Migrado para Nginx Proxy Manager
-  # ========================================
+  crowdsec-dashboard:
+    image: metabase/metabase:latest
+    environment:
+      - MB_DB_FILE=/metabase-data/metabase.db
+      - MGID=1000
+
+    volumes:
+      - crowdsec_dashboard:/metabase-data
+      - crowdsec_data:/crowdsec-db:ro  # Banco do CrowdSec em modo somente leitura
+
+    networks:
+      - security_internal
+      - traefik_public
+
+    depends_on:
+      - crowdsec
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.crowdsec-dashboard.rule=Host(`crowdsec.192.168.0.2.nip.io`)
+        - traefik.http.routers.crowdsec-dashboard.entrypoints=web
+        - traefik.http.services.crowdsec-dashboard.loadbalancer.server.port=3000
 
   # ========================================
   # MODSECURITY - Web Application Firewall
@@ -217,7 +236,7 @@ services:
       - ./modsecurity/logs:/var/log/modsec
 
     ports:
-      - "8888:8080"
+      - "8080:8080"
 
     networks:
       - traefik_public
@@ -257,5 +276,6 @@ services:
         - traefik.http.routers.whoami.rule=Host(`whoami.${DOMAIN}`)
         - traefik.http.routers.whoami.entrypoints=websecure
         - traefik.http.routers.whoami.tls.certresolver=letsencrypt
-        # NOTE: Whoami is a test service - no middlewares needed
+        # APLICA PROTEÇÕES BÁSICAS
+        - traefik.http.routers.whoami.middlewares=security-headers@docker
         - traefik.http.services.whoami.loadbalancer.server.port=80
