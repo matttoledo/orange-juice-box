@@ -22,8 +22,9 @@ all:
     docker_compose_version: "2.23.0"
 
     # Networks
-    traefik_network: traefik_public
-    default_network: traefik_public  # Main routing network (name kept for compatibility)
+    public_network: public_network
+    traefik_network: public_network  # Renamed from traefik_public in v3.0
+    default_network: public_network  # Main routing network
 
     # NPM (NEW in v3.0)
     npm_enabled: true

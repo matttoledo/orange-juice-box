@@ -11,7 +11,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${VERLY_DB_PASSWORD}
     networks:
       - traefik_public
-      - observability_monitoring_net
+      - swarm-monitoring_net
       - postgresql_network
     deploy:
       replicas: 1
@@ -69,8 +69,8 @@ services:
 networks:
   traefik_public:
     external: true
-  observability_monitoring_net:
+  swarm-monitoring_net:
     external: true
   postgresql_network:
     external: true
-    name: infrastructure_postgresql_network
+    name: postgresql_postgresql_network

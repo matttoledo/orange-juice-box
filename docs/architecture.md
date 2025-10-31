@@ -79,7 +79,7 @@ Orange Juice Box is a complete homelab infrastructure running on Orange Pi 5 Pro
 - **Cloudflare Tunnel** - Secure tunnel using QUIC protocol
 
 **Networks:**
-- `traefik_public` - Connected to all public services
+- `public_network` - Connected to all public services
 
 **Configuration:**
 - Tunnel ID: `18d4763d-f0e7-4447-9799-40bc36858295`
@@ -116,7 +116,7 @@ Orange Juice Box is a complete homelab infrastructure running on Orange Pi 5 Pro
 - **CrowdSec** - Threat detection engine (IDS/IPS)
 
 **Networks:**
-- `traefik_public` - Monitors all public traffic
+- `public_network` - Main routing network (all public services)
 - `security_internal` - Security components communication
 
 **Configuration:**
@@ -151,7 +151,7 @@ Headers → CrowdSec (monitors) → App
 **Networks:**
 - `postgresql_network` (encrypted with IPSec)
 - `redis_network` (encrypted with IPSec)
-- `traefik_public` (main routing network)
+- `public_network` (main routing network)
 - `security_internal` (CrowdSec communication)
 
 **Database Clients:**
@@ -176,7 +176,7 @@ Headers → CrowdSec (monitors) → App
 - **Node Exporter** - Host system metrics (global mode)
 
 **Networks:**
-- `traefik_public` - Web access (LAN only)
+- `public_network` - Web access (LAN only)
 - `monitoring_net` (encrypted) - Metrics collection
 - `postgresql_network` - Redash database access
 - `redis_network` - Redash cache
@@ -193,7 +193,7 @@ Headers → CrowdSec (monitors) → App
 - _(Add your applications here)_
 
 **Networks:**
-- `traefik_public` - Public access
+- `public_network` - Public access
 - `postgresql_network` - Database access
 - `monitoring_net` - Prometheus metrics
 
@@ -206,7 +206,7 @@ Headers → CrowdSec (monitors) → App
 ### All Networks (Encrypted with IPSec)
 
 ```
-traefik_public (overlay, encrypted)
+public_network (overlay, encrypted)
 ├── Traefik
 ├── Verly Service          [PUBLIC - Full protection]
 ├── Grafana                [LAN - No middlewares]

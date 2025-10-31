@@ -1,7 +1,7 @@
 version: '3.8'
 
 networks:
-  traefik_public:
+  public_network:
     external: true
   security_internal:
     external: true
@@ -30,7 +30,7 @@ services:
       - modsecurity_logs:/var/log/modsec
 
     networks:
-      - traefik_public
+      - public_network
       - security_internal
 
     deploy:

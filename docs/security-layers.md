@@ -456,7 +456,7 @@ networks:
 ### Encrypted Networks
 - `postgresql_network` - Database connections
 - `redis_network` - Cache connections
-- `traefik_public` - Public routing (all services)
+- `public_network` - Public routing (all services)
 - `security_internal` - Security components
 
 ### Benefits
@@ -468,7 +468,7 @@ networks:
 ### Verification
 ```bash
 # Check network encryption
-docker network inspect traefik_public | grep -A2 "encrypted"
+docker network inspect public_network | grep -A2 "encrypted"
 ```
 
 ---
@@ -768,7 +768,7 @@ docker exec $(docker ps -qf name=infrastructure_npm) \
 - Labels: Traefik labels → NPM proxy hosts
 
 **Compatibility:**
-- Network name `traefik_public` kept for compatibility
+- Network name `public_network` kept for compatibility
 - Can run Traefik and NPM side-by-side (different ports)
 - Old apps with Traefik labels still work if Traefik reactivated
 

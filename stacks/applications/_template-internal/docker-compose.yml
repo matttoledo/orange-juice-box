@@ -21,7 +21,7 @@ version: '3.8'
 # ========================================
 
 networks:
-  traefik_public:
+  public_network:
     external: true
 
   postgresql_network:
@@ -43,7 +43,7 @@ services:
       - APP_ENV=production
 
     networks:
-      - traefik_public
+      - public_network
       # - postgresql_network        # Uncomment if needed
 
     deploy:

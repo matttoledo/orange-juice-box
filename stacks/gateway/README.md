@@ -31,7 +31,7 @@ Internet → Cloudflare CDN → Cloudflare Tunnel → ModSecurity WAF → ...
 ```yaml
 Tunnel ID: 18d4763d-f0e7-4447-9799-40bc36858295
 Command: tunnel run --token ${TUNNEL_TOKEN}
-Network: traefik_public
+Network: public_network
 Replicas: 1
 ```
 
@@ -270,7 +270,7 @@ docker service ps waf_modsecurity
 docker service inspect gateway_cloudflare-tunnel | grep Networks
 docker service inspect waf_modsecurity | grep Networks
 
-# Should both show: traefik_public
+# Should both show: public_network
 ```
 
 ### Issue: Slow Response Times
@@ -303,7 +303,7 @@ time_total: %{time_total}\n
 version: '3.8'
 
 networks:
-  traefik_public:
+  public_network:
     external: true
 
 services:
@@ -311,7 +311,7 @@ services:
     image: cloudflare/cloudflared:latest
     command: tunnel run --token ${TUNNEL_TOKEN}
     networks:
-      - traefik_public
+      - public_network
     deploy:
       replicas: 1
       resources:
