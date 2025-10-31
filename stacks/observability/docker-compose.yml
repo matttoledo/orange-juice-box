@@ -50,10 +50,12 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
 
     networks:
       - monitoring_net
       - public_network
+      - postgresql_network
 
     deploy:
       replicas: 1
