@@ -23,6 +23,39 @@ all:
 
     # Networks
     traefik_network: traefik_public
+    default_network: traefik_public  # Main routing network (name kept for compatibility)
+
+    # NPM (NEW in v3.0)
+    npm_enabled: true
+    npm_version: "1.0.0"
+    npm_image: "npm-crowdsec-modsec:1.0.0"
+    npm_admin_port: 81
+    npm_db_name: "npm_db"
+    npm_db_user: "npm_user"
+    # npm_db_password in secrets.yml
+
+    # Cloudflare Tunnel (NEW in v3.0)
+    cloudflare_tunnel_enabled: true
+    cloudflare_tunnel_id: "18d4763d-f0e7-4447-9799-40bc36858295"
+    cloudflare_tunnel_protocol: "quic"
+    # cloudflare_tunnel_token in secrets.yml
+
+    # ModSecurity WAF (NEW in v3.0)
+    modsecurity_enabled: true
+    modsecurity_paranoia_level: 2
+    modsecurity_rules_version: "4.19.0"
+    modsecurity_rules_count: 837
+
+    # CrowdSec (Updated in v3.0)
+    crowdsec_enabled: true
+    crowdsec_version: "1.7.3"
+    crowdsec_scenarios: 58
+    # crowdsec_bouncer_key in secrets.yml
+
+    # Public Domains
+    api_domain: "api.verlyvidracaria.com"
+    api_backend_service: "applications_verly-service"
+    api_backend_port: 8080
 
   children:
     swarm_managers:
