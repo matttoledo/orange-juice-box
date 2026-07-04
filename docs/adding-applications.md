@@ -330,7 +330,7 @@ docker service ps my-app_my-app --no-trunc
 docker service logs security_traefik | grep my-app
 
 # Test from inside Swarm
-docker run --rm --network traefik_public alpine/curl curl http://my-app:8080/health
+docker run --rm --network public_network alpine/curl curl http://my-app:8080/health
 
 # Check firewall
 sudo ufw status
@@ -366,7 +366,7 @@ services:
       - DATABASE_URL=postgresql://user:${DB_PASSWORD}@postgresql:5432/mydb
 
     networks:
-      - traefik_public
+      - public_network
       - postgresql_network
 
     deploy:
@@ -391,7 +391,7 @@ services:
       - SECRET_KEY=${FLASK_SECRET}
 
     networks:
-      - traefik_public
+      - public_network
 
     deploy:
       labels:

@@ -1,0 +1,18 @@
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL - Verly DB
+    type: postgres
+    access: proxy
+    url: infrastructure_postgresql:5432
+    database: verly_db
+    user: verly_db_owner
+    secureJsonData:
+      password: 'yKEv8rW1ViQB'
+    jsonData:
+      database: 'verly_db'
+      sslmode: 'disable'
+      postgresVersion: 1600
+      timescaledb: false
+    isDefault: true
+    editable: true
