@@ -63,6 +63,9 @@ services:
   postgresql:
     image: postgres:16-alpine
 
+    ports:
+      - "5432:5432"  # Expose PostgreSQL to LAN for DBeaver access
+
     environment:
       - POSTGRES_DB=verly_db
       - POSTGRES_USER=verly_db_owner
@@ -164,7 +167,6 @@ services:
 
     ports:
       - "80:80"
-      - "443:443"
       - "81:81"
 
     environment:
@@ -188,6 +190,8 @@ services:
       - npm_logs:/var/log/nginx
       - modsecurity_logs:/var/log/modsecurity
       - crowdsec_logs:/var/log/crowdsec
+      # CUSTOM: Mount proxy configs para persistir correção CORS (18/12/2025)
+      - ./npm-configs:/data/nginx/proxy_host:rw
 
     networks:
       - postgresql_network
