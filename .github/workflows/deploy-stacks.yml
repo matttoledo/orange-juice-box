@@ -1,0 +1,105 @@
+name: Deploy Stacks
+
+# CI/CD da infra (Docker Swarm no OrangePi = self-hosted runner).
+# push -> detecta stacks alterados, valida, deploya.
+#   observability = auto | demais (prod) = gate manual (Environment 'production').
+# PR -> só valida (docker stack config), sem deploy.
+# workflow_dispatch -> redeploy manual de um stack (gated).
+
+on:
+  push:
+    branches: [master]
+    paths: ['stacks/**']
+  pull_request:
+    branches: [master]
+    paths: ['stacks/**']
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: 'Stack para (re)deploy manual'
+        required: true
+        type: choice
+        options:
+          - infrastructure
+          - security
+          - gateway
+          - observability
+          - verly
+          - verly-staging
+          - whatsapp-mvp
+
+jobs:
+  detect:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.f.outputs.changes }}
+      prod: ${{ steps.prod.outputs.list }}
+      observability: ${{ steps.f.outputs.observability }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            infrastructure: 'stacks/infrastructure/**'
+            security: 'stacks/security/**'
+            gateway: 'stacks/gateway/**'
+            verly: 'stacks/verly/**'
+            verly-staging: 'stacks/verly-staging/**'
+            whatsapp-mvp: 'stacks/whatsapp-mvp/**'
+            observability: 'stacks/observability/**'
+      - id: prod
+        run: echo "list=$(echo '${{ steps.f.outputs.changes }}' | jq -c 'map(select(. != "observability"))')" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: detect
+    if: ${{ needs.detect.outputs.changed != '[]' }}
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJSON(needs.detect.outputs.changed) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose (${{ matrix.stack }})
+        run: docker stack config -c stacks/${{ matrix.stack }}/docker-compose.yml > /dev/null && echo "compose OK: ${{ matrix.stack }}"
+
+  deploy-observability:
+    needs: [detect, validate]
+    if: ${{ github.event_name == 'push' && needs.detect.outputs.observability == 'true' }}
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy observability (auto)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || true
+          docker stack deploy -c stacks/observability/docker-compose.yml --with-registry-auth --resolve-image always observability
+
+  deploy-prod:
+    needs: [detect, validate]
+    if: ${{ github.event_name == 'push' && needs.detect.outputs.prod != '[]' }}
+    runs-on: self-hosted
+    environment: production   # gate manual (required reviewers)
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        stack: ${{ fromJSON(needs.detect.outputs.prod) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy ${{ matrix.stack }} (prod, aprovado)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || true
+          docker stack deploy -c stacks/${{ matrix.stack }}/docker-compose.yml --with-registry-auth --resolve-image always ${{ matrix.stack }}
+
+  manual-deploy:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: self-hosted
+    environment: production   # todo deploy manual passa pelo gate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy manual (${{ inputs.stack }})
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || true
+          docker stack deploy -c stacks/${{ inputs.stack }}/docker-compose.yml --with-registry-auth --resolve-image always ${{ inputs.stack }}
