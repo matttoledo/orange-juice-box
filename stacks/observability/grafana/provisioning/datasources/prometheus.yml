@@ -1,0 +1,27 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    editable: false
+    isDefault: false
+    jsonData:
+      timeInterval: 15s
+
+  - name: PostgreSQL - Verly Prod
+    type: postgres
+    access: proxy
+    url: infrastructure_postgresql:5432
+    database: verly_prod_db
+    user: verly_prod_owner
+    secureJsonData:
+      password: '1mWfLTLuPCTPQKGqRT80XuNofXLLwP0KdeEyovDRy34HVqxf9PxdhMVhfq8N1e7D'
+    jsonData:
+      database: 'verly_prod_db'
+      sslmode: 'disable'
+      postgresVersion: 1600
+      timescaledb: false
+    editable: true
