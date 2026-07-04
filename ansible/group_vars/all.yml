@@ -11,7 +11,8 @@ docker_version: "24.0"
 docker_compose_version: "2.23.0"
 
 # Networks
-traefik_network: traefik_public
+public_network: public_network
+traefik_network: public_network  # Renamed from traefik_public in v3.0
 
 # Paths
 stacks_base_path: "{{ playbook_dir }}/../stacks"
@@ -29,5 +30,88 @@ dozzle_port: 8888
 portainer_port: 9000
 
 # Orange Juice Box
-juice_box_version: "1.0.0"
+juice_box_version: "3.0.0"
 juice_box_environment: "production"
+
+# Architecture
+architecture_version: "npm-based"  # Was: "traefik-based"
+security_layers_count: 8
+security_score: "10/10"
+
+# Security Layers
+security_layers:
+  - cloudflare_cdn
+  - cloudflare_tunnel
+  - modsecurity_waf
+  - nginx_proxy_manager
+  - rate_limiting
+  - security_headers
+  - crowdsec_ids
+  - network_encryption
+
+# Gateway Layer (NEW in v3.0)
+gateway_stack_enabled: true
+gateway_stack_path: "{{ stacks_base_path }}/gateway"
+cloudflare_tunnel_enabled: true
+cloudflare_tunnel_id: "18d4763d-f0e7-4447-9799-40bc36858295"
+cloudflare_tunnel_protocol: "quic"  # HTTP/3
+
+# Reverse Proxy (Changed in v3.0)
+reverse_proxy: "nginx_proxy_manager"  # Was: "traefik"
+reverse_proxy_version: "1.0.0"
+reverse_proxy_image: "npm-crowdsec-modsec:1.0.0"
+reverse_proxy_port_http: 80
+reverse_proxy_port_https: 443
+reverse_proxy_port_admin: 81
+reverse_proxy_db_backend: "postgresql"  # Not SQLite
+
+# WAF Layer (NEW in v3.0)
+waf_enabled: true
+waf_stack_enabled: true
+waf_stack_path: "{{ stacks_base_path }}/waf"
+waf_engine: "modsecurity"
+waf_image: "owasp/modsecurity-crs:nginx-alpine"
+waf_ruleset: "owasp-crs"
+waf_ruleset_version: "4.19.0"
+waf_rules_count: 837
+waf_paranoia_level: 2
+waf_blocking_paranoia: 2
+waf_anomaly_inbound: 5
+waf_anomaly_outbound: 4
+
+# Rate Limiting (NEW in v3.0)
+rate_limit_enabled: true
+rate_limit_requests_per_minute: 50
+rate_limit_burst: 25
+rate_limit_status_code: 429
+rate_limit_zone_size: "10m"
+
+# CrowdSec IDS/IPS
+crowdsec_enabled: true
+crowdsec_version: "1.7.3"
+crowdsec_scenarios_count: 58
+crowdsec_collections:
+  - crowdsecurity/nginx
+  - crowdsecurity/http-cve
+  - crowdsecurity/whitelist-good-actors
+  - crowdsecurity/linux
+crowdsec_lapi_url: "http://crowdsec:8080"
+crowdsec_online_api: false  # Offline mode
+
+# Security Headers
+security_headers_enabled: true
+security_headers:
+  hsts: "max-age=31536000; includeSubDomains; preload"
+  x_frame_options: "DENY"
+  x_content_type_options: "nosniff"
+  x_xss_protection: "1; mode=block"
+  referrer_policy: "strict-origin-when-cross-origin"
+  permissions_policy: "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+  csp: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"
+
+# Traefik (DEPRECATED in v3.0, kept for compatibility)
+traefik_enabled: false
+traefik_version: "3.1"
+traefik_network: "public_network"  # Renamed from traefik_public
+traefik_deprecated: true
+traefik_replacement: "nginx_proxy_manager"

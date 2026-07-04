@@ -15,13 +15,6 @@ networks:
     labels:
       - "description=Encrypted Redis network"
 
-  public_network:
-    external: true
-
-  security_internal:
-    external: true
-    name: security_security_internal
-
 volumes:
   postgresql_data:
     labels:
@@ -33,38 +26,12 @@ volumes:
     labels:
       - "description=Redis persistent data (AOF)"
 
-  npm_data:
-    labels:
-      - "description=NPM configuration and database (if using SQLite)"
-      - "backup=daily"
-
-  npm_letsencrypt:
-    labels:
-      - "description=NPM Let's Encrypt certificates"
-      - "backup=weekly"
-      - "critical=true"
-
-  npm_logs:
-    labels:
-      - "description=NPM access logs"
-
-  modsecurity_logs:
-    labels:
-      - "description=ModSecurity audit logs"
-
-  crowdsec_logs:
-    labels:
-      - "description=CrowdSec integration logs"
-
 services:
   # ========================================
   # POSTGRESQL - Shared Database Server
   # ========================================
   postgresql:
     image: postgres:16-alpine
-
-    ports:
-      - "5432:5432"  # Expose PostgreSQL to LAN for DBeaver access
 
     environment:
       - POSTGRES_DB=verly_db
@@ -158,92 +125,3 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # ========================================
-  # NGINX PROXY MANAGER - Reverse Proxy
-  # ========================================
-  npm:
-    image: npm-crowdsec-modsec:1.0.0
-
-    ports:
-      - "80:80"
-      - "81:81"
-
-    environment:
-      # PostgreSQL Database (usando serviço local)
-      - DB_POSTGRES_HOST=postgresql
-      - DB_POSTGRES_PORT=5432
-      - DB_POSTGRES_USER=npm_user
-      - DB_POSTGRES_PASSWORD=gdc4QwsPiIJHienvZRZMOR7MJpzdNbi1
-      - DB_POSTGRES_NAME=npm_db
-
-      # Disable IPv6
-      - DISABLE_IPV6=true
-
-      # CrowdSec Integration (security-stack)
-      - CROWDSEC_LAPI_URL=http://crowdsec:8080
-      - CROWDSEC_LAPI_KEY=${CROWDSEC_BOUNCER_KEY}
-
-    volumes:
-      - npm_data:/data
-      - npm_letsencrypt:/etc/letsencrypt
-      - npm_logs:/var/log/nginx
-      - modsecurity_logs:/var/log/modsecurity
-      - crowdsec_logs:/var/log/crowdsec
-      # CUSTOM: Mount proxy configs para persistir correção CORS (18/12/2025)
-      - ./npm-configs:/data/nginx/proxy_host:rw
-
-    networks:
-      - postgresql_network
-      - public_network
-      - security_internal
-
-    depends_on:
-      - postgresql
-
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
-
-      update_config:
-        parallelism: 1
-        delay: 10s
-        failure_action: rollback
-        order: start-first
-
-      labels:
-        - "description=🔐 Nginx Proxy Manager with CrowdSec & ModSecurity"
-        - "category=infrastructure"
-        - "layer=gateway"
-        - "component=reverse-proxy"
-        - "exposure=public"
-        - "status=production"
-        - "version=1.0.0"
-        - "ports=80,443,81"
-        - "security=crowdsec,modsecurity"
-        - "database=postgresql"
-        - "connections=all-services"
-
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:81/api"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s

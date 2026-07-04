@@ -67,3 +67,15 @@ ENV/
 # Orange Juice Box specific
 orange-juice-box-data/
 monitoring-data/
+
+# cruft de compose (backups/experimentos)
+*.bak
+*.bak2
+*.backup-*
+*.improved
+*.pragmatico
+*.temp-backup
+*.pre-whisper-backup*
+prompts/
+# codigo do bot vive no repo verly-whatsapp-bot
+stacks/whatsapp-mvp/orchestrator/

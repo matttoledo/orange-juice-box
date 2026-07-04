@@ -1,7 +1,7 @@
 version: '3.8'
 
 networks:
-  public_network:
+  traefik_public:
     external: true
 
   postgresql_network:
@@ -32,18 +32,6 @@ volumes:
     labels:
       - "description=Portainer configuration and data"
 
-  netdata_config:
-    labels:
-      - "description=Netdata configuration"
-
-  netdata_lib:
-    labels:
-      - "description=Netdata state database"
-
-  netdata_cache:
-    labels:
-      - "description=Netdata metrics cache"
-
 services:
   # ========================================
   # GRAFANA - Monitoring Dashboards
@@ -62,11 +50,9 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./grafana/provisioning/dashboards-defs:/etc/grafana/dashboards:ro
 
     networks:
-      - public_network
+      - traefik_public
       - monitoring_net
 
     deploy:
@@ -129,7 +115,7 @@ services:
 
     networks:
       - monitoring_net
-      - public_network
+      - traefik_public
 
     deploy:
       replicas: 1
@@ -197,7 +183,7 @@ services:
       - "5000:5000"  # Direct access via IP
 
     networks:
-      - public_network
+      - traefik_public
       - postgresql_network
       - redis_network
       - monitoring_net
@@ -390,7 +376,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
     networks:
-      - public_network
+      - traefik_public
 
     deploy:
       replicas: 1
@@ -434,7 +420,7 @@ services:
       - portainer_data:/data
 
     networks:
-      - public_network
+      - traefik_public
 
     deploy:
       replicas: 1
@@ -468,7 +454,13 @@ services:
         - "traefik.http.routers.portainer.entrypoints=web"
         - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
-    # Healthcheck removed - Portainer image doesn t include wget/curl
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   # ========================================
   # CADVISOR - Container Metrics
   # ========================================
@@ -518,7 +510,6 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-      - '--collector.textfile.directory=/host/var/lib/node-exporter/textfile'
 
     volumes:
       - /:/host:ro,rslave
@@ -547,65 +538,3 @@ services:
         - "status=production"
         - "mode=global"
         - "metrics-for=prometheus"
-
-  # ========================================
-  # NETDATA - Realtime host + container observability
-  # ========================================
-  # Auto-discovers hardware (CPU, RAM, disk, thermal zones, docker containers).
-  # Local UI at :19999. Free tier — 1h high-res retention on-agent, forever.
-  # Optionally claim to Netdata Cloud (free up to 5 nodes) for remote view.
-  netdata:
-    image: netdata/netdata:stable
-
-    hostname: orangepi
-
-    ports:
-      - "19999:19999"
-
-    cap_add:
-      - SYS_PTRACE
-      - SYS_ADMIN
-
-    security_opt:
-      - apparmor=unconfined
-
-    environment:
-      - DOCKER_HOST=/var/run/docker.sock
-      - DO_NOT_TRACK=1
-      - NETDATA_DISABLE_CLOUD=1  # remove ao querer claim pra Cloud grátis
-
-    volumes:
-      - netdata_config:/etc/netdata
-      - netdata_lib:/var/lib/netdata
-      - netdata_cache:/var/cache/netdata
-      - /:/host/root:ro,rslave
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /etc/os-release:/host/etc/os-release:ro
-      - /var/log:/host/var/log:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-
-    networks:
-      - monitoring_net
-
-    deploy:
-      mode: global
-
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.1'
-          memory: 128M
-
-      labels:
-        - "description=🩺 Netdata — realtime, auto-discovering host + container monitor"
-        - "category=observability"
-        - "layer=observability"
-        - "component=realtime-metrics"
-        - "exposure=internal"
-        - "status=production"
-        - "mode=global"
