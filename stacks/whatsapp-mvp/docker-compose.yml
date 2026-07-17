@@ -112,7 +112,10 @@ services:
           memory: 256M
 
   orchestrator:
-    image: ghcr.io/verlao/verly-whatsapp-bot:staging
+    # Live runs :latest (the verly-whatsapp-bot repo's own deploy job does
+    # `docker service update --image :latest`). Kept in sync here so a stack
+    # redeploy doesn't roll the image back.
+    image: ghcr.io/verlao/verly-whatsapp-bot:latest
     networks:
       - whatsapp_mvp_net
       - public_network
@@ -124,6 +127,14 @@ services:
         target: verly_bot_username
       - source: verly_bot_password
         target: verly_bot_password
+      # LLM backend keys (ferraz primary token + openrouter/gemini fallback).
+      - source: llm_api_key
+        target: llm_api_key
+      - source: openrouter_api_key
+        target: openrouter_api_key
+      # Evolution API key (used by the media fallback path).
+      - source: whatsapp_evolution_api_key
+        target: whatsapp_evolution_api_key
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -136,6 +147,18 @@ services:
       LOG_LEVEL: "INFO"
       RKLLM_TIMEOUT_S: "30"
       VERLY_TIMEOUT_S: "10"
+
+      # --- Extraction backend (captured from live; was set imperatively) ---
+      # Current live state = openrouter/gemini. To switch to ferraz-primary +
+      # gemini-fallback, flip EXTRACTION_BACKEND=ferraz + LLM_MODEL=qwen/qwen3.6-35b-a3b
+      # ONCE the verly-whatsapp-bot image with cross-provider fallback (PR #29) is live.
+      EXTRACTION_BACKEND: "openrouter"
+      LLM_MODEL: "gpt-oss-20b"
+      EXTRACTION_MODEL: "google/gemini-2.5-flash-lite"
+      LLM_VISION_MODEL: "gpt-oss-20b"
+      # Evolution API (media fallback path)
+      EVOLUTION_URL: "http://evolution-api:8080"
+      EVOLUTION_INSTANCE: "father"
     deploy:
       replicas: 1
       restart_policy:
@@ -173,4 +196,8 @@ secrets:
   verly_bot_username:
     external: true
   verly_bot_password:
+    external: true
+  llm_api_key:
+    external: true
+  openrouter_api_key:
     external: true
