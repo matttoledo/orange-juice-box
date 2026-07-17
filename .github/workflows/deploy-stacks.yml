@@ -63,7 +63,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate compose (${{ matrix.stack }})
-        run: docker stack config -c stacks/${{ matrix.stack }}/docker-compose.yml > /dev/null && echo "compose OK: ${{ matrix.stack }}"
+        # block scalar: um `run:` de linha única com `: ` interno (ex.: "OK: x")
+        # quebra o parser YAML do Actions (workflow falha em 0s). Bloco resolve.
+        run: |
+          docker stack config -c stacks/${{ matrix.stack }}/docker-compose.yml > /dev/null
+          echo "compose OK ${{ matrix.stack }}"
+
+  plan:
+    # "terraform plan" — em PR, mostra o diff do desejado (git) vs o vivo (swarm).
+    # Só informativo (comenta no PR), não faz deploy. Roda no self-hosted (precisa
+    # falar com o swarm vivo).
+    needs: detect
+    if: ${{ github.event_name == 'pull_request' && needs.detect.outputs.changed != '[]' }}
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gerar plan (desejado vs vivo)
+        run: python3 scripts/stack-plan.py ${{ join(fromJSON(needs.detect.outputs.changed), ' ') }} > "/tmp/stack-plan-${{ github.run_id }}.md"
+      - name: Comentar plan no PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          f="/tmp/stack-plan-${{ github.run_id }}.md"
+          # upsert: edita o último comentário do bot, senão cria um novo
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file "$f" --edit-last 2>/dev/null \
+            || gh pr comment "${{ github.event.pull_request.number }}" --body-file "$f"
+          rm -f "$f"
 
   deploy-observability:
     needs: [detect, validate]
