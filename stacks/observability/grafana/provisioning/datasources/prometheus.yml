@@ -13,6 +13,7 @@ datasources:
 
   - name: PostgreSQL - Verly Prod
     type: postgres
+    uid: verly-prod-pg
     access: proxy
     url: infrastructure_postgresql:5432
     database: verly_prod_db
