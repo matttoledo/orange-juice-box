@@ -68,6 +68,7 @@ services:
     networks:
       - public_network
       - monitoring_net
+      - postgresql_network   # reach infrastructure_postgresql for the Verly Prod datasource
 
     deploy:
       replicas: 1
@@ -206,7 +207,7 @@ services:
       - redis
 
     deploy:
-      replicas: 1
+      replicas: 0   # turned off (heavy on the Pi); captured from live 0/0
 
       resources:
         limits:
@@ -268,7 +269,7 @@ services:
       - redis
 
     deploy:
-      replicas: 1
+      replicas: 0   # turned off (heavy on the Pi); captured from live 0/0
 
       resources:
         limits:
@@ -311,7 +312,7 @@ services:
       - redis
 
     deploy:
-      replicas: 2
+      replicas: 0   # turned off (heavy on the Pi); captured from live 0/0
 
       resources:
         limits:
@@ -354,7 +355,7 @@ services:
       - redis
 
     deploy:
-      replicas: 1
+      replicas: 0   # turned off (heavy on the Pi); captured from live 0/0
 
       resources:
         limits:
