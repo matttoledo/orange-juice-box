@@ -8,3 +8,7 @@ creation_rules:
   # Arquivos .env criptografados
   - path_regex: .*\.env\.encrypted$
     age: age1lp0mjc900vahqvuyg6dr45vcpu03pddljspkhw6pppj8k5vp49kqynk9nq
+
+  # Swarm secrets versionados (docker secret) — provisionados por scripts/provision-secrets.sh
+  - path_regex: secrets/.*\.enc\.(json|yaml)$
+    age: age1lp0mjc900vahqvuyg6dr45vcpu03pddljspkhw6pppj8k5vp49kqynk9nq
