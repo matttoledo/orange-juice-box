@@ -38,7 +38,7 @@
       "title": "Extrações por dia",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -75,7 +75,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -89,7 +89,7 @@
       "title": "Total de extrações",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -131,7 +131,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "table",
           "rawQuery": true,
@@ -145,7 +145,7 @@
       "title": "Intent",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -179,7 +179,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "table",
           "rawQuery": true,
@@ -206,7 +206,7 @@
       "title": "Extrações por backend",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -243,7 +243,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -257,7 +257,7 @@
       "title": "Fallback → gemini (%)",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -300,7 +300,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "table",
           "rawQuery": true,
@@ -314,7 +314,7 @@
       "title": "Por backend / modelo",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -338,7 +338,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "table",
           "rawQuery": true,
@@ -365,7 +365,7 @@
       "title": "Válidas vs inválidas por dia",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -402,7 +402,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -416,7 +416,7 @@
       "title": "Motivo (output_reason)",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -450,7 +450,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "table",
           "rawQuery": true,
@@ -477,7 +477,7 @@
       "title": "Latência Verly (ms, avg)",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -515,7 +515,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -529,7 +529,7 @@
       "title": "HTTP code Verly (pega 429/5xx)",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -553,7 +553,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "table",
           "rawQuery": true,
@@ -567,7 +567,7 @@
       "title": "Receita / Lucro por dia (R$)",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 8,
@@ -605,7 +605,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -619,7 +619,7 @@
       "title": "Leads postados por dia",
       "datasource": {
         "type": "postgres",
-        "uid": "verly-prod-pg"
+        "uid": "PE00B02BADB9EBD3C"
       },
       "gridPos": {
         "h": 7,
@@ -656,7 +656,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "verly-prod-pg"
+            "uid": "PE00B02BADB9EBD3C"
           },
           "format": "time_series",
           "rawQuery": true,
