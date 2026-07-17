@@ -8,6 +8,11 @@
 **/.env
 **/secrets.yml.dec
 **/secrets.dec.*
+# SOPS-encrypted files ARE safe to commit — un-ignore them (the `.env.*` rule
+# above was swallowing `*.env.encrypted`, defeating the whole SOPS setup).
+!*.env.encrypted
+!**/*.env.encrypted
+!**/.env.encrypted
 
 # age keys (SOPS)
 keys.txt
